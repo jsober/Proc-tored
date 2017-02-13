@@ -16,7 +16,6 @@ subtest 'run_lock' => sub {
     is read_file($proc->path), "$$\n", 'pidfile has expected contents';
     is $proc->running_pid, $$, 'running_pid returns current pid';
     ok $proc->is_running, 'is_running true';
-
     ok !$proc->run_lock, 'run_lock returns false when lock already held';
   };
 

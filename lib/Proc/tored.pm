@@ -94,7 +94,7 @@ has path => (
 
 sub _build_path {
   my $self = shift;
-  join '/', $self->dir, $self->name;
+  sprintf '%s/%s.pid', $self->dir, $self->name;
 }
 
 =head2 is_running
