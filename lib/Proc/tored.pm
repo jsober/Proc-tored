@@ -2,7 +2,11 @@ use strict;
 use warnings;
 
 package Proc::tored;
-# ABSTRACT: Manage a process with its pid file
+# ABSTRACT: Manage a process using a pid file
+
+=head1 NAME
+
+Proc::tored - manage a process using a pid file
 
 =head1 SYNOPSIS
 
@@ -18,6 +22,8 @@ package Proc::tored;
     die "process $pid is being stubborn!";
   }
 
+=head1 DESCRIPTION
+
 =cut
 
 use Moo;
@@ -30,6 +36,8 @@ use Type::Utils qw(declare as where);
 
 my $NonEmptyStr = declare, as Str, where { $_ =~ /\S/ };
 my $Directory = declare, as $NonEmptyStr, where { -d $_ };
+
+with 'Proc::tored::Role::Running';
 
 =head1 METHODS
 
@@ -53,9 +61,7 @@ pid file.
 
 =item poll_wait_time
 
-Optionally pecifies the length of time (in fractional seconds) during which the
-process will sleep when calling L</stop_running_service> with a C<timeout>.
-Defaults to 0.2 seconds.
+See L<Proc::tored::Role::Running/poll_wait_time>.
 
 =back
 
@@ -71,12 +77,6 @@ has name => (
   is  => 'ro',
   isa => $NonEmptyStr,
   required => 1,
-);
-
-has poll_wait_time => (
-  is  => 'ro',
-  isa => Num,
-  default => 0.2,
 );
 
 =head2 path
@@ -99,16 +99,9 @@ sub _build_path {
 
 =head2 is_running
 
-Returns true while the service is running in the current process.
+See L<Proc::tored::Role::Running/is_running>.
 
 =cut
-
-has is_running => (
-  is  => 'ro',
-  isa => Bool,
-  default => 0,
-  init_arg => undef,
-);
 
 =head2 service
 
@@ -191,33 +184,17 @@ sub running_pid {
 
 =head2 stop_running_process
 
-Sends a C<SIGTERM> to the active process. Returns 0 immediately if the pid file
-does not exist or is empty. Otherwise, polls the running process until the OS
-reports that it is no longer able to receive signals (using `kill(0, $pid)`).
-
-Accepts a C<$timeout> in fractional seconds, causing the function to return 0
-if the process takes longer than C<$timeout> seconds to complete.
-
-Returns the pid of the completed process otherwise.
+See L<Proc::tored::Role::Running/stop_running_process>. When called from this
+class, the C<$pid> parameter is provided via L</running_pid>.
 
 =cut
 
-sub stop_running_process {
-  my ($self, $timeout) = @_;
-  my $sleep = $self->poll_wait_time;
-  my $pid = $self->running_pid or return 0;
-
-  if (kill('SIGTERM', $pid) > 0) {
-    if ($timeout) {
-      while (kill(0, $pid) > 0 && $timeout > 0) {
-        sleep $sleep;
-        $timeout -= $sleep;
-      }
-    }
-  }
-
-  kill(0, $pid) == 0 ? $pid : 0;
-}
+around stop_running_process => sub {
+  my $orig = shift;
+  my $self = shift;
+  my $pid  = $self->running_pid or return 0;
+  return $self->$orig($pid, @_);
+};
 
 =head2 run_lock
 
@@ -259,23 +236,15 @@ sub run_lock {
   flock $fh, LOCK_SH;
 
   # Mark service as running
-  $self->{is_running} = 1;
+  $self->start;
 
   # Create guard object that releases the pidfile once out of scope
   my $guard = guard {
-    $self->{is_running} = 0;
+    $self->stop;
     flock $fh, LOCK_EX; # switch to exclusive lock for writing
     truncate $fh, 0;    # clear pidfile contents
     flock $fh, LOCK_UN; # unlock
     close $fh;          # close
-  };
-
-  # Set up sigterm handler
-  my $sigterm_handler = $SIG{TERM};
-
-  $SIG{TERM} = sub {
-    $self->{is_running} = 0;
-    $sigterm_handler->(@_) if $sigterm_handler;
   };
 
   return $guard;
