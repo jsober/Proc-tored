@@ -1,10 +1,10 @@
 use strict;
 use warnings;
 
-package Runner {
-  use Moo;
-  with 'Proc::tored::Role::Running';
-};
+package Runner;
+use Moo;
+with 'Proc::tored::Role::Running';
+1;
 
 package main;
 use Test2::Bundle::Extended;
