@@ -112,6 +112,38 @@ has is_running => (
 
 =head2 service
 
+Accepts a code ref which will be called repeatedly until it or L</is_running>
+return false. While the service is running, a C<SIGTERM> handler is installed.
+When a C<SIGTERM> is received, L</is_running> will be set to false and service
+loop will self-terminate.
+
+Note that it is possible for a signal to arrive between the L</is_running>
+check and the execution of the code ref. If this is a concern for the caller,
+it is recommended that the code ref avoid blocking for long periods, such as
+extended C<sleep> times or long-running database queries which perl cannot
+interrupt.
+
+Example using a pool of forked workers, an imaginary task queue, and a
+secondary condition that decides whether to stop running (aside from the
+built-in C<SIGTERM> handler):
+
+  $proctor->service(sub {
+    # Wait for an available worker, but with a timeout
+    my $worker = $worker_pool->next_available(0.1);
+
+    if ($worker) {
+      # Pull next task from the queue with a 0.1s timeout
+      my $task = poll_queue_with_timeout(0.1);
+
+      if ($task) {
+        $worker->assign($task);
+      }
+    }
+
+    return unless touch_file_exists();
+    return 1;
+  });
+
 =cut
 
 sub service {
@@ -130,6 +162,9 @@ sub service {
 }
 
 =head2 running_pid
+
+Returns the pid identified in the pid file. Returns 0 if the pid file does
+not exist or is empty.
 
 =cut
 
@@ -156,6 +191,15 @@ sub running_pid {
 
 =head2 stop_running_process
 
+Sends a C<SIGTERM> to the active process. Returns 0 immediately if the pid file
+does not exist or is empty. Otherwise, polls the running process until the OS
+reports that it is no longer able to receive signals (using `kill(0, $pid)`).
+
+Accepts a C<$timeout> in fractional seconds, causing the function to return 0
+if the process takes longer than C<$timeout> seconds to complete.
+
+Returns the pid of the completed process otherwise.
+
 =cut
 
 sub stop_running_process {
@@ -176,6 +220,16 @@ sub stop_running_process {
 }
 
 =head2 run_lock
+
+Attempts to atomically acquire the run lock. Once held, the pid file is created
+(if needed) and the current process' pid is written to it, L</is_running> will
+return true and a C<SIGTERM> handler will be active. Existing handlers will
+be executed after the one assigned for the run lock.
+
+If the lock is acquired, a L<Guard> object is returned that will release the
+lock once out of scope. Returns undef otherwise.
+
+L</service> is preferred to this method for most uses.
 
 =cut
 

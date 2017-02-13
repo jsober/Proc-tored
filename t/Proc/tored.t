@@ -63,4 +63,18 @@ subtest 'stop service' => sub {
   is $i, 4, 'service stops when is_running is false';
 };
 
+subtest 'sigterm' => sub {
+  my $i = 0;
+
+  my $do_stuff = sub {
+    ++$i;
+    kill 'SIGTERM', $$ if $i == 3;
+    die 'backstop activated' if $i > 5; # backstop
+    return 1;
+  };
+
+  my $service = $proc->service($do_stuff);
+  is $i, 3, 'service self-terminates after SIGTERM received';
+};
+
 done_testing;

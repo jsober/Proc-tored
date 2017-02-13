@@ -1,5 +1,4 @@
 `Proc::tored` is a perl module to make it simpler to manage a service using a pid file.
-The name is a very poor pun on the work "proctor". You're welcome.
 
     use Proc::tored;
 
