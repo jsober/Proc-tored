@@ -1,5 +1,3 @@
 /.build
 /Proc-tored*
 *.swp
-/nytprof*
-/cover_db
