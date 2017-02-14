@@ -90,6 +90,9 @@ self-terminate (assuming it is also C<Proc::tored>). Accepts an optional
 C<$timeout> in fractional seconds, causing C<zap> to wait up to C<$timeout>
 seconds for the process to exit.
 
+  zap $service, 30
+    or die 'timed out after 30s waiting for service to exit';
+
 =cut
 
 use parent 'Exporter';
