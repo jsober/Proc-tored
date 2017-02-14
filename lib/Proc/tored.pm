@@ -1,6 +1,3 @@
-use strict;
-use warnings;
-
 package Proc::tored;
 # ABSTRACT: Manage a process using a pid file
 
@@ -26,6 +23,8 @@ Proc::tored - manage a process using a pid file
 
 =cut
 
+use strict;
+use warnings;
 use Moo;
 use Carp;
 use Guard qw(guard);
@@ -106,9 +105,10 @@ See L<Proc::tored::Role::Running/is_running>.
 =head2 service
 
 Accepts a code ref which will be called repeatedly until it or L</is_running>
-return false. While the service is running, a C<SIGTERM> handler is installed.
-When a C<SIGTERM> is received, L</is_running> will be set to false and service
-loop will self-terminate.
+return false. While the service is running, handlers for C<SIGTERM>, C<SIGINT>,
+C<SIGPIPE>, and C<SIGHUP> are installed. When one of these signals are
+received, L</is_running> will be set to false and service loop will
+self-terminate.
 
 Note that it is possible for a signal to arrive between the L</is_running>
 check and the execution of the code ref. If this is a concern for the caller,
@@ -118,7 +118,7 @@ interrupt.
 
 Example using a pool of forked workers, an imaginary task queue, and a
 secondary condition that decides whether to stop running (aside from the
-built-in C<SIGTERM> handler):
+built-in signal handlers):
 
   $proctor->service(sub {
     # Wait for an available worker, but with a timeout
@@ -200,8 +200,8 @@ around stop_running_process => sub {
 
 Attempts to atomically acquire the run lock. Once held, the pid file is created
 (if needed) and the current process' pid is written to it, L</is_running> will
-return true and a C<SIGTERM> handler will be active. Existing handlers will
-be executed after the one assigned for the run lock.
+return true and a signal handlers will be active. Existing handlers will be
+executed after the one assigned for the run lock.
 
 If the lock is acquired, a L<Guard> object is returned that will release the
 lock once out of scope. Returns undef otherwise.
