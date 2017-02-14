@@ -2,6 +2,8 @@ Proc::tored change log
 
 {{$NEXT}}
 
+0.02 2017-02-14
+
 - New interface
 - Trap normal signals (TERM, INT, HUP, PIPE)
 - Rewrote cleanup code to handle unexpected errors more reliably
