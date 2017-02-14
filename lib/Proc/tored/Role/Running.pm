@@ -117,14 +117,17 @@ sub start {
   $self->{is_running} = 1;
 
   my %sig = %SIG;
+  my @signals = qw(TERM INT PIPE HUP);
+  my @existing = grep { $sig{$_} } @signals;
+
   $self->{signal_handler} = \%sig;
 
   $SIG{$_} = $self->_build_signal_handler($_)
-    foreach qw(TERM INT PIPE HUP);
+    foreach @signals;
 
   $self->{run_guard} = guard {
-    $SIG{$_} = $sig{$_} # resore signal handlers
-      foreach qw(TERM INT PIPE HUP);
+    undef $SIG{$_} foreach @signals; # remove our handlers
+    $SIG{$_} = $sig{$_} foreach @existing; # restore original handlers
   };
 
   return 1;

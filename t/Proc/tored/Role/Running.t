@@ -21,7 +21,7 @@ subtest 'basics' => sub {
   isnt $sigterm_handler, $SIG{TERM}, 'SIGTERM handler installed is new';
   ok $runner->stop, 'stop';
   ok !$runner->is_running, 'is_running post stop';
-  is $sigterm_handler, $SIG{TERM}, 'SIGTERM handler removed';
+  is $SIG{TERM} || undef, $sigterm_handler, 'SIGTERM handler removed';
 };
 
 subtest 'sigterm' => sub {
@@ -30,7 +30,7 @@ subtest 'sigterm' => sub {
   $runner->start;
   kill 'SIGTERM', $$;
   ok !$runner->is_running, 'is_running post sigterm';
-  is $sigterm_handler, $SIG{TERM}, 'SIGTERM handler removed';
+  is $SIG{TERM} || undef, $sigterm_handler, 'SIGTERM handler removed';
 };
 
 done_testing;
