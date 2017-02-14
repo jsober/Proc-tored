@@ -1,5 +1,5 @@
 package Proc::tored::Role::Running;
-# ABSTRACT: Thing
+# ABSTRACT: add running state and signal handling to services
 
 use strict;
 use warnings;
@@ -153,11 +153,11 @@ sub stop {
 
 Issues a C<SIGTERM> to the active process. Returns 0 immediately if the pid
 file does not exist or is empty. Otherwise, polls the running process until the
-OS reports that it is no longer able to receive signals (using `kill(0,
-$pid)`).
+OS reports that it is no longer able to receive signals (with `kill(0, $pid)`).
 
-Accepts a C<$timeout> in fractional seconds, causing the function to return 0
-if the process takes longer than C<$timeout> seconds to complete.
+Optional parameter C<$timeout> may be specified in fractional seconds, causing
+C<stop_running_process> to block up to (around) C<$timeout> seconds waiting for
+the signaled process to exit.
 
 Returns the pid of the completed process otherwise.
 

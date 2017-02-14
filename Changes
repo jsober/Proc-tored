@@ -2,6 +2,7 @@ iRevision history for Perl extension MooX::PluginKit.
 
 {{$NEXT}}
 
+- New interface
 - Trap normal signals (TERM, INT, HUP, PIPE)
 - Rewrote cleanup code to handle unexpected errors more reliably
 - Fixed some inconsistent results in unit tests (hopefully)

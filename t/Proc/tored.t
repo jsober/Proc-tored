@@ -1,79 +1,43 @@
 use strict;
 use warnings;
 use Test2::Bundle::Extended;
-use File::Slurp;
 
 use Proc::tored;
 
-ok my $proc = Proc::tored->new(name => 'proc-tored-test-' . $$, dir => '/tmp'), 'new';
-ok !$proc->is_running, 'is_running false initially';
-is $proc->running_pid, 0, 'running_pid is 0 with no running process';
+my $name = 'proc-tored-test';
+my $dir  = '/tmp';
 
-subtest 'run_lock' => sub {
-  {
-    ok my $lock = $proc->run_lock, 'acquire run lock';
-    ok -f $proc->path, 'pidfile created';
-    is read_file($proc->path), "$$\n", 'pidfile has expected contents';
-    is $proc->running_pid, $$, 'running_pid returns current pid';
-    ok $proc->is_running, 'is_running true';
-    ok !$proc->run_lock, 'run_lock returns false when lock already held';
-  };
-
-  ok -f $proc->path, 'pidfile exists after guard out of scope';
-  is read_file($proc->path), '', 'pidfile empty after guard out of scope';
-  is $proc->running_pid, 0, 'running_pid returns 0 after guard out of scope';
-  ok !$proc->is_running, 'is_running false after guard out of scope';
+subtest 'service creation' => sub {
+  my $proctor = service $name, in $dir, poll 0.5;
+  is ref $proctor, 'Proc::tored::Manager', 'expected class';
+  is $proctor->name, $name, 'expected name';
+  is $proctor->dir, $dir, 'expected dir';
+  is $proctor->poll_wait_time, 0.5, 'expected poll_wait_time';
 };
 
-subtest 'run service' => sub {
-  my $i = 0;
-  my $do_stuff = sub { ++$i % 3 != 0 };
-
-  ok my $service = $proc->service($do_stuff), 'run service';
-  is $i, 3, 'service callback was called expected number of times';
-
-  {
-    my $lock = $proc->run_lock;
-    ok !$proc->service($do_stuff), 'service returns false when cannot acquire lock';
-    $i = 0; is $i, 0, 'service callback is not called when service fails to acquire lock';
-  };
+subtest 'service' => sub {
+  my $proctor = service $name, in $dir;
+  my $pid; my $count = 0;
+  run { $pid = running $proctor; ++$count < 4 } $proctor;
+  is $count, 4, 'expected work completed';
+  is $pid, $$, 'expected pid while running';
+  is 0, running $proctor, 'no running pid';
 };
 
-subtest 'stop service' => sub {
-  my $service;
-
-  my $i = 0;
-  my $do_stuff = sub {
-    if (++$i % 5 == 0) {
-      return 0;
-    }
-
-    if ($i % 4 == 0) {
-      $proc->{is_running} = 0;
-    }
-    elsif ($i >= 10) {
-      die 'backstop activated';
-    }
-
-    return 1;
-  };
-
-  ok $service = $proc->service($do_stuff), 'run service';
-  is $i, 4, 'service stops when is_running is false';
+subtest 'stop' => sub {
+  my $proctor = service $name, in $dir;
+  my $count = 0;
+  run { ++$count < 4 or stop $proctor } $proctor;
+  is $count, 4, 'expected work completed';
+  is 0, running $proctor, 'no running pid';
 };
 
-subtest 'sigterm' => sub {
-  my $i = 0;
-
-  my $do_stuff = sub {
-    ++$i;
-    kill 'SIGTERM', $$ if $i == 3;
-    die 'backstop activated' if $i > 5; # backstop
-    return 1;
-  };
-
-  my $service = $proc->service($do_stuff);
-  is $i, 3, 'service self-terminates after SIGTERM received';
+subtest 'zap' => sub {
+  my $proctor = service $name, in $dir;
+  my $count = 0;
+  run { ++$count < 4 or zap $proctor } $proctor;
+  is $count, 4, 'expected work completed';
+  is 0, running $proctor, 'no running pid';
 };
 
 done_testing;
