@@ -60,10 +60,6 @@ pid file.
 A valid directory path where the pid file is to be created or an existing pid
 file is to be found.
 
-=item poll_wait_time
-
-See L<Proc::tored::Role::Running/poll_wait_time>.
-
 =back
 
 =cut
@@ -231,7 +227,7 @@ sub run_lock {
     print $fh "$$\n" or die "error writing to pidfile: $!";
   };
 
-  # Switch to shared lock
+  # Downgrade to shared lock
   flock $fh, LOCK_SH;
 
   # Mark service as running

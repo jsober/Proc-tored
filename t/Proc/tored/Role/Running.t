@@ -8,6 +8,8 @@ use Guard 'scope_guard';
 use Test2::Bundle::Extended;
 use Proc::tored::Role::Running;
 
+bail_out 'OS unsupported' if $^O eq 'MSWin32';
+
 subtest 'basics' => sub {
   my $sigterm_handler = $SIG{TERM};
   ok my $runner = Runner->new, 'new';

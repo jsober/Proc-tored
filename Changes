@@ -2,6 +2,9 @@ Proc::tored change log
 
 {{$NEXT}}
 
+- Replace poll_wait_time attribute with parameter to Proc::tored::Role::Running->stop_running_process
+- bail_out of tests on mswin32 (see https://github.com/jsober/Proc-tored/issues/1)
+
 0.02 2017-02-14
 
 - New interface

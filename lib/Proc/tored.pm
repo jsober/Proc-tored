@@ -45,13 +45,6 @@ Sets the directory where the pid file will be created.
 
   my $service = service 'thing', in '/var/run';
 
-=head2 poll
-
-Optional; controls the sleep time between polls when L</zap>ping a process
-with a blocking wait/timeout.
-
-  my $service = service 'thing', in '/var/run', poll 0.5;
-
 =head2 run
 
 Starts the service loop, calling the supplied code block until it either
@@ -66,7 +59,7 @@ via L</zap>).
 
 =head2 stop
 
-Tells the L</poll> loop to shut down.
+Tells the L</run> loop to shut down.
 
   run {
     my $task = get_next_task() or stop $service;
@@ -98,7 +91,6 @@ use parent 'Exporter';
 our @EXPORT = qw(
   service
   in
-  poll
   run
   stop
   running
@@ -107,7 +99,6 @@ our @EXPORT = qw(
 
 sub service ($%)  { Proc::tored::Manager->new(name => shift, @_) }
 sub in      ($;@) { dir => shift, @_ }
-sub poll    ($;@) { poll_wait_time => shift, @_ }
 sub run     (&$)  { $_[1]->service($_[0]) }
 sub stop    ($)   { $_[0]->stop }
 sub running ($)   { $_[0]->running_pid }

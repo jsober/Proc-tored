@@ -40,20 +40,6 @@ calling L</stop_running_process>), the class will voluntarily L</stop> itself.
 
 =head1 ATTRIBUTES
 
-=head2 poll_wait_time
-
-Optionally specifies the length of time (in fractional seconds) during which
-the process will sleep when calling L</stop_running_service> with a C<timeout>.
-Defaults to 0.2 seconds.
-
-=cut
-
-has poll_wait_time => (
-  is  => 'ro',
-  isa => Num,
-  default => 0.2,
-);
-
 =head2 run_guard
 
 A Guard used to ensure signal handlers are restored when the object is destroyed.
@@ -132,9 +118,9 @@ Returns the pid of the completed process otherwise.
 sub _alive { kill(0, $_[0]) != 0 }
 
 sub stop_running_process {
-  my ($self, $pid, $timeout) = @_;
-  my $sleep = $self->poll_wait_time;
+  my ($self, $pid, $timeout, $sleep) = @_;
   return 0 unless $pid;
+  $sleep //= 0.2;
 
   if (kill('SIGTERM', $pid) > 0) {
     if ($timeout) {

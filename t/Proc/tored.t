@@ -1,15 +1,16 @@
 use Test2::Bundle::Extended;
 use Proc::tored;
 
+bail_out 'OS unsupported' if $^O eq 'MSWin32';
+
 my $name = 'proc-tored-test';
 my $dir  = '/tmp';
 
 subtest 'service creation' => sub {
-  my $proctor = service $name, in $dir, poll 0.5;
+  my $proctor = service $name, in $dir;
   is ref $proctor, 'Proc::tored::Manager', 'expected class';
   is $proctor->name, $name, 'expected name';
   is $proctor->dir, $dir, 'expected dir';
-  is $proctor->poll_wait_time, 0.5, 'expected poll_wait_time';
 };
 
 subtest 'service' => sub {
