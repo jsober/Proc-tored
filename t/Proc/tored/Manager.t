@@ -1,11 +1,9 @@
-use strict;
-use warnings;
-use Test2::Bundle::Extended;
+use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
 use File::Slurp;
 
-use Proc::tored::Manager;
+bail_out('OS unsupported') if $^O eq 'MSWin32';
 
-ok my $proc = Proc::tored::Manager->new(name => 'proc-tored-test-' . $$, dir => '/tmp'), 'new';
+ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => '/tmp'), 'new';
 ok !$proc->is_running, 'is_running false initially';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 

@@ -1,6 +1,11 @@
 package Proc::tored;
 # ABSTRACT: Manage a process using a pid file
 
+use strict;
+use warnings;
+require Exporter;
+require Proc::tored::Manager;
+
 =head1 NAME
 
 Proc::tored - manage a process using a pid file
@@ -23,13 +28,6 @@ Proc::tored - manage a process using a pid file
 =head1 DESCRIPTION
 
 A C<Proc::tored> service is voluntarily managed by a pid file and signals.
-
-=cut
-
-use strict;
-use warnings;
-require Exporter;
-require Proc::tored::Manager;
 
 =head1 EXPORTED SUBROUTINES
 

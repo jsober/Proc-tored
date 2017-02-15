@@ -1,8 +1,7 @@
-use strict;
-use warnings;
 use Test2::Bundle::Extended;
-
 use Proc::tored;
+
+bail_out('OS unsupported') if $^O eq 'MSWin32';
 
 my $name = 'proc-tored-test';
 my $dir  = '/tmp';

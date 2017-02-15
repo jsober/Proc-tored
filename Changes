@@ -2,6 +2,8 @@ Proc::tored change log
 
 {{$NEXT}}
 
+- Bail out of tests on MSWin32
+
 0.02 2017-02-14
 
 - New interface

@@ -1,6 +1,3 @@
-use strict;
-use warnings;
-
 package Runner;
 use Moo;
 with 'Proc::tored::Role::Running';
@@ -8,8 +5,9 @@ with 'Proc::tored::Role::Running';
 
 package main;
 use Test2::Bundle::Extended;
-
 use Proc::tored::Role::Running;
+
+bail_out('OS unsupported') if $^O eq 'MSWin32';
 
 subtest 'basics' => sub {
   my $sigterm_handler = $SIG{TERM};
