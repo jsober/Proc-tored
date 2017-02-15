@@ -118,7 +118,7 @@ Returns the pid of the completed process otherwise.
 sub stop_running_process {
   my ($self, $pid, $timeout, $sleep) = @_;
   return 0 unless $pid;
-  $sleep //= 0.2;
+  $sleep ||= 0.2;
 
   if (kill('TERM', $pid) > 0) {
     if ($timeout) {

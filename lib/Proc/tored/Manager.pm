@@ -166,7 +166,7 @@ sub running_pid {
   return 0 unless $file->is_file;
   my ($line) = $file->lines({count => 1, chomp => 1}) or return 0;
   my ($pid) = $line =~ /^(\d+)$/;
-  return $pid // 0;
+  return $pid || 0;
 }
 
 =head2 stop_running_process
