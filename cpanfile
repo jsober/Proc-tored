@@ -10,5 +10,6 @@ requires 'Types::Standard' => 0;
 
 on test => sub {
   requires 'File::Slurp' => 0;
+  requires 'Guard' => 0;
   requires 'Test2::Bundle::Extended' => 0;
 };

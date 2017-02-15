@@ -4,10 +4,9 @@ with 'Proc::tored::Role::Running';
 1;
 
 package main;
+use Guard 'scope_guard';
 use Test2::Bundle::Extended;
 use Proc::tored::Role::Running;
-
-bail_out('OS unsupported') if $^O eq 'MSWin32';
 
 subtest 'basics' => sub {
   my $sigterm_handler = $SIG{TERM};
@@ -23,12 +22,24 @@ subtest 'basics' => sub {
 };
 
 subtest 'sigterm' => sub {
-  my $sigterm_handler = $SIG{TERM};
+  # Restore existing sigterm handlers after completing the subtest
+  my $existing = $SIG{TERM};
+  scope_guard { $SIG{TERM} = $existing };
+
+  # Set sigterm handler that sets a flag for testing
+  my $handled = 0;
+  my $handler = $SIG{TERM} = sub { $handled = 1 };
+
   my $runner = Runner->new;
   $runner->start;
+
+  isnt $SIG{TERM}, $handler, 'handler overridden post start';
+
   kill 'SIGTERM', $$;
   ok !$runner->is_running, 'is_running post sigterm';
-  is $SIG{TERM} || undef, $sigterm_handler, 'SIGTERM handler removed';
+  ok $handled, 'overridden handler called on sigterm';
+
+  is $SIG{TERM} || undef, $handler, 'overriddent handler restored';
 };
 
 done_testing;

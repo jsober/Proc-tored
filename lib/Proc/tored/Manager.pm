@@ -169,10 +169,8 @@ sub running_pid {
   return 0 unless -f $path;
 
   sysopen my $fh, $path, O_RDONLY or croak "error opening $path: $!";
-  #flock $fh, LOCK_SH;
 
   if (defined(my $line = <$fh>)) {
-    #flock $fh, LOCK_UN;
     close $fh;
 
     chomp $line;
@@ -218,8 +216,7 @@ sub run_lock {
 
   sysopen my $fh, $path, O_WRONLY|O_CREAT or croak "error opening $path: $!";
 
-  # If another process has an exclusive lock, it should be considered to have
-  # the run lock as well.
+  # Another process has the ball
   unless (flock $fh, LOCK_EX|LOCK_NB) {
     close $fh;
     return;
@@ -241,15 +238,12 @@ sub run_lock {
   $self->start;
 
   # Create guard object that releases the pidfile once out of scope
-  my $guard = guard {
+  return guard {
     $self->stop;
-    flock $fh, LOCK_EX; # switch to exclusive lock for writing
-    truncate $fh, 0;    # clear pidfile contents
-    flock $fh, LOCK_UN; # unlock
-    close $fh;          # close
+    truncate $fh, 0;
+    flock $fh, LOCK_UN;
+    close $fh;
   };
-
-  return $guard;
 }
 
 1;

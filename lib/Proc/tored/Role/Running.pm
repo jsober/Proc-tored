@@ -8,6 +8,8 @@ use Types::Standard -types;
 use Time::HiRes 'sleep';
 use Guard 'guard';
 
+my @SIGNALS = qw(TERM INT PIPE HUP);
+
 =head1 NAME
 
 Proc::tored::Role::Running
@@ -85,18 +87,17 @@ this method, L</is_running> will return true.
 sub start {
   my $self = shift;
   my %sig = %SIG;
-  my @signals = qw(TERM INT PIPE HUP);
-  my @existing = grep { $sig{$_} } @signals;
+  my @existing = grep { $sig{$_} } @SIGNALS;
 
-  foreach my $signal (@signals) {
+  foreach my $signal (@SIGNALS) {
     $SIG{$signal} = sub {
-      $self->stop;
       $sig{$signal} && $sig{$signal}->(@_);
+      $self->stop;
     };
   }
 
   $self->{run_guard} = guard {
-    undef $SIG{$_} foreach @signals; # remove our handlers
+    undef $SIG{$_} foreach @SIGNALS; # remove our handlers
     $SIG{$_} = $sig{$_} foreach @existing; # restore original handlers
     undef %sig;
   };
@@ -128,7 +129,7 @@ Returns the pid of the completed process otherwise.
 
 =cut
 
-sub _alive { kill(0, $_[0]) > 0 }
+sub _alive { kill(0, $_[0]) != 0 }
 
 sub stop_running_process {
   my ($self, $pid, $timeout) = @_;
