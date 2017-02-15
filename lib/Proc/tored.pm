@@ -1,5 +1,5 @@
 package Proc::tored;
-# ABSTRACT: Manage a process using a pid file
+# ABSTRACT: Service management using a pid file and signals
 
 use strict;
 use warnings;
@@ -8,7 +8,7 @@ require Proc::tored::Manager;
 
 =head1 NAME
 
-Proc::tored - manage a process using a pid file
+Proc::tored - Service management using a pid file and signals
 
 =head1 SYNOPSIS
 
