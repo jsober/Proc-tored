@@ -52,33 +52,6 @@ has poll_wait_time => (
   default => 0.2,
 );
 
-=head2 is_running
-
-Returns true while the service is running in the current process.
-
-=cut
-
-has is_running => (
-  is  => 'ro',
-  isa => Bool,
-  default => 0,
-  init_arg => undef,
-);
-
-=head2 signal_handler
-
-Used internally to store the previously set signal handlers while
-L</is_running> is true.
-
-=cut
-
-has signal_handler => (
-  is  => 'ro',
-  isa => Map[Str, CodeRef],
-  default => sub { {} },
-  init_arg => undef,
-);
-
 =head2 run_guard
 
 A Guard used to ensure signal handlers are restored when the object is destroyed.
@@ -93,6 +66,14 @@ has run_guard => (
 
 =head1 METHODS
 
+=head2 is_running
+
+Returns true while the service is running in the current process.
+
+=cut
+
+sub is_running { defined $_[0]->run_guard ? 1 : 0 }
+
 =head2 start
 
 Flags the current process as I<running>. While running, handlers for
@@ -101,36 +82,26 @@ this method, L</is_running> will return true.
 
 =cut
 
-sub _build_signal_handler {
-  my ($self, $signal) = @_;
-
-  sub {
-    $self->{is_running} = 0; # redundant, but an existing sigterm handler may inspect it
-    $self->signal_handler->{$signal}->(@_)
-      if $self->signal_handler->{$signal};
-    $self->stop;
-  };
-}
-
 sub start {
   my $self = shift;
-  $self->{is_running} = 1;
-
   my %sig = %SIG;
   my @signals = qw(TERM INT PIPE HUP);
   my @existing = grep { $sig{$_} } @signals;
 
-  $self->{signal_handler} = \%sig;
-
-  $SIG{$_} = $self->_build_signal_handler($_)
-    foreach @signals;
+  foreach my $signal (@signals) {
+    $SIG{$signal} = sub {
+      $self->stop;
+      $sig{$signal} && $sig{$signal}->(@_);
+    };
+  }
 
   $self->{run_guard} = guard {
     undef $SIG{$_} foreach @signals; # remove our handlers
     $SIG{$_} = $sig{$_} foreach @existing; # restore original handlers
+    undef %sig;
   };
 
-  return 1;
+  $self->is_running;
 }
 
 =head2 stop
@@ -141,13 +112,7 @@ will return false.
 
 =cut
 
-sub stop {
-  my $self = shift;
-  $self->{is_running} = 0;
-  undef $self->{run_guard};
-  $self->{signal_handler} = {};
-  return 1;
-}
+sub stop { undef $_[0]->{run_guard}; !$_[0]->is_running; }
 
 =head2 stop_running_process
 
