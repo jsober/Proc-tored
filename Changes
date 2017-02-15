@@ -2,6 +2,8 @@ Proc::tored change log
 
 {{$NEXT}}
 
+0.03 2017-02-15
+
 - Replace poll_wait_time attribute with parameter to Proc::tored::Role::Running->stop_running_process
 - Use secondary lock file to avoid inconsistent flocking on mswin32
 
