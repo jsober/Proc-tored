@@ -115,23 +115,21 @@ Returns the pid of the completed process otherwise.
 
 =cut
 
-sub _alive { kill(0, $_[0]) != 0 }
-
 sub stop_running_process {
   my ($self, $pid, $timeout, $sleep) = @_;
   return 0 unless $pid;
   $sleep //= 0.2;
 
-  if (kill('SIGTERM', $pid) > 0) {
+  if (kill('TERM', $pid) > 0) {
     if ($timeout) {
-      while (_alive($pid) && $timeout > 0) {
+      while (kill(0, $pid) && $timeout > 0) {
         sleep $sleep;
         $timeout -= $sleep;
       }
     }
   }
 
-  _alive($pid) ? $pid : 0;
+  !kill(0, $pid);
 }
 
 1;

@@ -1,24 +1,22 @@
 use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
-use File::Slurp;
-
-bail_out 'OS unsupported' if $^O eq 'MSWin32';
+use Path::Tiny 'path';
 
 ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => '/tmp'), 'new';
 ok !$proc->is_running, 'is_running false initially';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 
 subtest 'run_lock' => sub {
-  {
-    ok my $lock = $proc->run_lock, 'acquire run lock';
-    ok -f $proc->path, 'pidfile created';
-    is read_file($proc->path), "$$\n", 'pidfile has expected contents';
-    is $proc->running_pid, $$, 'running_pid returns current pid';
-    ok $proc->is_running, 'is_running true';
-    ok !$proc->run_lock, 'run_lock returns false when lock already held';
-  };
+  my $path = path($proc->filepath);
 
-  ok -f $proc->path, 'pidfile exists after guard out of scope';
-  is read_file($proc->path), '', 'pidfile empty after guard out of scope';
+  ok my $lock = $proc->run_lock, 'acquire run lock';
+  ok $path->is_file, 'pidfile created';
+  is $proc->running_pid, $$, 'running_pid returns current pid';
+  ok $proc->is_running, 'is_running true';
+  ok !$proc->run_lock, 'run_lock returns false when lock already held';
+
+  undef $lock;
+
+  ok $path->is_file, 'pidfile remains after guard out of scope';
   is $proc->running_pid, 0, 'running_pid returns 0 after guard out of scope';
   ok !$proc->is_running, 'is_running false after guard out of scope';
 };

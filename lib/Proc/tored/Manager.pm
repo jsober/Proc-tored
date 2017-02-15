@@ -29,11 +29,12 @@ use strict;
 use warnings;
 use Moo;
 use Carp;
-use Guard qw(guard);
+use Guard qw(guard scope_guard);
 use Fcntl qw(:flock :seek :DEFAULT);
 use Time::HiRes qw(sleep);
 use Types::Standard qw(Str Bool Num is_CodeRef);
 use Type::Utils qw(declare as where);
+use Path::Tiny qw(path);
 
 my $NonEmptyStr = declare, as Str, where { $_ =~ /\S/ };
 my $Directory = declare, as $NonEmptyStr, where { -d $_ };
@@ -76,20 +77,20 @@ has name => (
   required => 1,
 );
 
-=head2 path
+=head2 filepath
 
 Returns the file system path created by concatenating the values of C<dir> and
 C<name> that were passed to C<new>.
 
 =cut
 
-has path => (
+has filepath => (
   is  => 'lazy',
   isa => $NonEmptyStr,
   init_arg => undef,
 );
 
-sub _build_path {
+sub _build_filepath {
   my $self = shift;
   sprintf '%s/%s.pid', $self->dir, $self->name;
 }
@@ -161,21 +162,11 @@ not exist or is empty.
 
 sub running_pid {
   my $self = shift;
-  my $path = $self->path;
-  return 0 unless -f $path;
-
-  sysopen my $fh, $path, O_RDONLY or croak "error opening $path: $!";
-
-  if (defined(my $line = <$fh>)) {
-    close $fh;
-
-    chomp $line;
-    my ($pid) = $line =~ /^(\d+)$/;
-
-    return $pid || 0;
-  }
-
-  return 0;
+  my $file = path($self->filepath);
+  return 0 unless $file->is_file;
+  my ($line) = $file->lines({count => 1, chomp => 1}) or return 0;
+  my ($pid) = $line =~ /^(\d+)$/;
+  return $pid // 0;
 }
 
 =head2 stop_running_process
@@ -208,37 +199,27 @@ L</service> is preferred to this method for most uses.
 
 sub run_lock {
   my $self = shift;
-  my $path = $self->path;
+  my $pid = $self->running_pid;
+  $pid && kill(0, $pid) && return; # pid points to running process
 
-  sysopen my $fh, $path, O_WRONLY|O_CREAT or croak "error opening $path: $!";
+  # existing .lock file means another process came in ahead
+  my $lock = path($self->filepath . '.lock');
+  my $locked = $lock->filehandle({exclusive => 1}, '>')
+    or return;
 
-  # Another process has the ball
-  unless (flock $fh, LOCK_EX|LOCK_NB) {
-    close $fh;
-    return;
-  }
+  # remove the lock file when out of scope
+  scope_guard { $lock->remove };
 
-  # Write pid to pidfile with autoflush on so it will be immediately available
-  # to other processes.
-  do {
-    truncate $fh, 0;       # clear pidfile contents
-    seek $fh, 0, SEEK_SET; # return to beginning of the file
-    local $| = 1;
-    print $fh "$$\n" or die "error writing to pidfile: $!";
-  };
+  # write pid to the pidfile
+  my $file = path($self->filepath);
+  $file->spew("$$\n");
 
-  # Downgrade to shared lock
-  flock $fh, LOCK_SH;
-
-  # Mark service as running
   $self->start;
 
   # Create guard object that releases the pidfile once out of scope
   return guard {
     $self->stop;
-    truncate $fh, 0;
-    flock $fh, LOCK_UN;
-    close $fh;
+    $file->append({truncate => 1});
   };
 }
 
