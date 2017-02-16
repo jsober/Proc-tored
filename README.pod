@@ -1,8 +1,14 @@
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
-Proc::tored - service management using a pid file and signals
+Proc::tored - Service management using a pid file and signals
+
+=head1 VERSION
+
+version 0.05
 
 =head1 SYNOPSIS
 

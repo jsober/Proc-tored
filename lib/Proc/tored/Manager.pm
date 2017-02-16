@@ -1,10 +1,6 @@
 package Proc::tored::Manager;
 # ABSTRACT: OO interface to creating a proctored service
 
-=head1 NAME
-
-Proc::tored::Manager
-
 =head1 SYNOPSIS
 
   my $proctor = Proc::tored::Manager->new(dir => '/tmp', name => 'my-service');

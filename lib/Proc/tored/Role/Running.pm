@@ -10,10 +10,6 @@ use Guard 'guard';
 
 my @SIGNALS = qw(TERM INT PIPE HUP);
 
-=head1 NAME
-
-Proc::tored::Role::Running
-
 =head1 SYNOPSIS
 
   package Some::Thing;
