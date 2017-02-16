@@ -1,9 +1,9 @@
 use Test2::Bundle::Extended;
 use Proc::tored;
-use File::Temp;
 
 my $name = 'proc-tored-test';
-my $dir  = File::Temp::newdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0, TMPDIR => 1);
+my $dir = Path::Tiny->tempdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0);
+skip_all 'could not create writable temp directory' unless -w $dir;
 
 subtest 'service creation' => sub {
   my $proctor = service $name, in $dir;

@@ -10,8 +10,7 @@ requires 'Type::Tiny'      => 0;
 requires 'Types::Standard' => 0;
 
 on test => sub {
-  requires 'File::Temp' => 0,
   requires 'Guard' => 0;
-  requires 'Path::Tiny' => 0.066;
+  requires 'Path::Tiny' => 0.097;
   requires 'Test2::Bundle::Extended' => 0;
 };

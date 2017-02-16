@@ -2,7 +2,7 @@ Proc::tored change log
 
 {{$NEXT}}
 
-- Use File::Temp for pidfile directory in tests
+- Use Path::Tiny->tempdir for pidfile directory in tests
 
 0.03 2017-02-15
 
