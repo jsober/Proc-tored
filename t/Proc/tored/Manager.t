@@ -1,8 +1,8 @@
 use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
 use Path::Tiny 'path';
-use File::Temp 'tempdir';
+use File::Temp;
 
-my $dir = tempdir(CLEANUP => 1);
+my $dir = File::Temp::newdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0, TMPDIR => 1);
 
 ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => $dir), 'new';
 ok !$proc->is_running, 'is_running false initially';
