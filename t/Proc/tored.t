@@ -1,8 +1,9 @@
 use Test2::Bundle::Extended;
 use Proc::tored;
+use File::Temp 'tempdir';
 
 my $name = 'proc-tored-test';
-my $dir  = '/tmp';
+my $dir  = tempdir(CLEANUP => 1);
 
 subtest 'service creation' => sub {
   my $proctor = service $name, in $dir;

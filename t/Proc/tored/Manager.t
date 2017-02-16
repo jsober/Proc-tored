@@ -1,7 +1,10 @@
 use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
 use Path::Tiny 'path';
+use File::Temp 'tempdir';
 
-ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => '/tmp'), 'new';
+my $dir = tempdir(CLEANUP => 1);
+
+ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => $dir), 'new';
 ok !$proc->is_running, 'is_running false initially';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 
