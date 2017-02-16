@@ -8,7 +8,7 @@ require Proc::tored::Manager;
 
 =head1 NAME
 
-Proc::tored - Service management using a pid file and signals
+Proc::tored - service management using a pid file and signals
 
 =head1 SYNOPSIS
 
@@ -83,6 +83,17 @@ seconds for the process to exit.
 
   zap $service, 30
     or die 'timed out after 30s waiting for service to exit';
+
+=head1 AUTHOR
+
+Jeff Ober <jeffober@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2017 by Jeff Ober.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =cut
 
