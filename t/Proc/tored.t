@@ -1,4 +1,5 @@
 use Test2::Bundle::Extended;
+use Path::Tiny;
 use Proc::tored;
 
 my $name = 'proc-tored-test';
