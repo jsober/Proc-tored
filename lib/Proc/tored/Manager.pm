@@ -29,12 +29,13 @@ use strict;
 use warnings;
 use Moo;
 use Carp;
-use Guard qw(guard scope_guard);
 use Fcntl qw(:flock :seek :DEFAULT);
-use Time::HiRes qw(sleep);
-use Types::Standard qw(Str Bool Num is_CodeRef);
-use Type::Utils qw(declare as where);
+use Guard qw(guard scope_guard);
 use Path::Tiny qw(path);
+use Time::HiRes qw(sleep);
+use Try::Tiny;
+use Type::Utils qw(declare as where);
+use Types::Standard qw(Str Bool Num is_CodeRef);
 
 my $NonEmptyStr = declare, as Str, where { $_ =~ /\S/ };
 my $Directory = declare, as $NonEmptyStr, where { -d $_ };
@@ -204,8 +205,21 @@ sub run_lock {
 
   # existing .lock file means another process came in ahead
   my $lock = path($self->filepath . '.lock');
-  my $locked = $lock->filehandle({exclusive => 1}, '>')
-    or return;
+  return if $lock->exists;
+
+  my $locked = try {
+      $lock->filehandle({exclusive => 1}, '>');
+    }
+    catch {
+      # Rethrow if error was something other than the file already existing.
+      # Assume any 'sysopen' error matching 'File exists' is an indication
+      # of that.
+      die $_
+        unless $_->{op} eq 'sysopen' && $_->{err} =~ /File exists/i
+            || $lock->exists;
+    };
+
+  return unless $locked;
 
   # remove the lock file when out of scope
   scope_guard { $lock->remove };
