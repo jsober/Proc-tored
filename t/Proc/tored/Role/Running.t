@@ -39,7 +39,7 @@ subtest 'sigterm' => sub {
   ok !$runner->is_running, 'is_running post sigterm';
   ok $handled, 'overridden handler called on sigterm';
 
-  is $SIG{TERM} || undef, $handler, 'overriddent handler restored';
+  is $SIG{TERM} || undef, $handler, 'overridden handler restored';
 };
 
 done_testing;
