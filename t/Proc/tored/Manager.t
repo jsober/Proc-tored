@@ -66,8 +66,21 @@ subtest 'sigterm' => sub {
 
   my $do_stuff = sub {
     ++$i;
-    kill 'SIGTERM', $$ if $i == 3;
-    die 'backstop activated' if $i > 5; # backstop
+
+    if ($i == 3) {
+      if ($^O eq 'MSWin32') {
+        # Simulate a signal being received on mswin32+threads because only the parent
+        # process receives signals (in this case, the parent is `prove`).
+        $SIG{TERM}->();
+      }
+      else {
+        kill 'TERM', $$;
+      }
+    }
+    elsif ($i > 5) {
+      die 'backstop activated'; # backstop
+    }
+
     return 1;
   };
 
