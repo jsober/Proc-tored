@@ -86,7 +86,24 @@ seconds for the process to exit.
 
 =head1 CAVEATS
 
+=head2 Threads
+
+A C<Proc::tored> service voluntarily self-terminates when it receives one of
+C<SIGTERM>, C<SIGINT>, C<SIGHUP>, or C<SIGPIPE>. On threaded perls, only the
+main thread receives signals. It is highly likely that a C<Proc::tored> service
+started outside the main thread will not respond to being L</zap>ped by another
+process.
+
+See B<catching signals> under L<http://perldoc.perl.org/threads.html#WARNINGS>
+for details.
+
 =head2 MSWin32
+
+The same warnings about threads apply to forked processes on MSWin32 perls as
+a result of C<fork()> being implemented using threads on that platform.
+
+See the notes regarding pseudoprocesses under
+L<http://perldoc.perl.org/perlfork.html#kill()>.
 
 =head1 AUTHOR
 
