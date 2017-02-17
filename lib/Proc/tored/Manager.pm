@@ -34,7 +34,7 @@ use Type::Utils qw(declare as where);
 use Types::Standard qw(Str Bool Num is_CodeRef);
 
 my $NonEmptyStr = declare, as Str, where { $_ =~ /\S/ };
-my $Directory = declare, as $NonEmptyStr, where { -d $_ };
+my $Directory = declare, as $NonEmptyStr, where { -d $_ && -w $_ };
 
 with 'Proc::tored::Role::Running';
 
@@ -58,6 +58,18 @@ pid file.
 A valid directory path where the pid file is to be created or an existing pid
 file is to be found.
 
+=item term_file
+
+By default (and on supported platforms), posix signals are used to signal a
+managed process to voluntarily self-terminate. On non-compliant systems (e.g.
+MSWin32), a touch file is used instead. The path to this file is automatically
+constructed from L</name> in L</dir> unless manually specified.
+
+=item filepath
+
+Unless manually specified, the pid file's C<filepath> is constructed from
+L</name> in L</dir>.
+
 =back
 
 =cut
@@ -74,6 +86,16 @@ has name => (
   required => 1,
 );
 
+has '+term_file' => (
+  is => 'lazy',
+);
+
+sub _build_term_file {
+  my $self = shift;
+  my $file = path($self->dir)->child($self->name . '.term');
+  return "$file";
+}
+
 =head2 filepath
 
 Returns the file system path created by concatenating the values of C<dir> and
@@ -89,7 +111,8 @@ has filepath => (
 
 sub _build_filepath {
   my $self = shift;
-  sprintf '%s/%s.pid', $self->dir, $self->name;
+  my $file = path($self->dir)->child($self->name . '.pid');
+  return "$file";
 }
 
 =head2 is_running
@@ -203,7 +226,7 @@ sub stop_running_process {
   my $pid = $self->running_pid || return 0;
   return $self->stop if $pid == $$;
 
-  if (kill('TERM', $pid) > 0) {
+  if ($self->signal > 0) {
     if ($timeout) {
       while (kill(0, $pid) && $timeout > 0) {
         sleep $sleep;

@@ -1,6 +1,7 @@
 Proc::tored change log
 
 {{$NEXT}}
+- Allow use of a touch file to signal self-termination on systems with poor support for signals
 
 0.05 2017-02-17
 

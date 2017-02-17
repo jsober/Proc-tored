@@ -2,6 +2,7 @@ use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
 use Path::Tiny 'path';
 
 my $dir = Path::Tiny->tempdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0);
+my $term = $dir->child("$$.term");
 skip_all 'could not create writable temp directory' unless -w $dir;
 
 ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => $dir), 'new';
@@ -61,31 +62,32 @@ subtest 'stop service' => sub {
   is $i, 4, 'service stops when is_running is false';
 };
 
-subtest 'sigterm' => sub {
+subtest 'signal' => sub {
   my $i = 0;
 
   my $do_stuff = sub {
-    ++$i;
-
-    if ($i == 3) {
-      if ($^O eq 'MSWin32') {
-        # Simulate a signal being received on mswin32+threads because only the parent
-        # process receives signals (in this case, the parent is `prove`).
-        $SIG{TERM}->();
-      }
-      else {
-        kill 'TERM', $$;
-      }
+    # Increment test value
+    if ($i < 3) {
+      ++$i;
     }
-    elsif ($i > 5) {
+    # Signal service to stop
+    elsif ($i == 3) {
+      $proc->signal($$);
+    }
+    # Failsafe
+    elsif ($i > 300) {
       die 'backstop activated'; # backstop
+    }
+    # Yield so alarm can go off
+    elsif ($i > 3) {
+      sleep 1;
     }
 
     return 1;
   };
 
   my $service = $proc->service($do_stuff);
-  is $i, 3, 'service self-terminates after SIGTERM received';
+  is $i, 3, 'service self-terminates after being signalled';
 };
 
 done_testing;

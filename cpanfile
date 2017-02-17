@@ -1,4 +1,5 @@
 requires 'Carp'            => 0;
+requires 'Const::Fast'     => 0;
 requires 'Exporter'        => 0;
 requires 'Fcntl'           => 0;
 requires 'Guard'           => 0;

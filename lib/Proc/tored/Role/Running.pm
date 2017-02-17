@@ -4,11 +4,15 @@ package Proc::tored::Role::Running;
 use strict;
 use warnings;
 use Moo::Role;
-use Types::Standard -types;
-use Time::HiRes 'sleep';
+use Carp;
+use Const::Fast;
 use Guard 'guard';
+use Path::Tiny 'path';
+use Time::HiRes 'ualarm';
+use Types::Standard -types;
 
-my @SIGNALS = qw(TERM INT PIPE HUP);
+const our $NOSIGNALS => $^O eq 'MSWin32';
+const our @SIGNALS => qw(TERM INT PIPE HUP);
 
 =head1 SYNOPSIS
 
@@ -37,6 +41,20 @@ voluntarily L</stop> itself.
 
 =head1 ATTRIBUTES
 
+=head2 term_file
+
+On systems where posix signals are not supported or are poorly implemented (looking
+at YOU, MSWin32), setting a C<term_file> causes the class to instead monitor for a
+touch file's existence as the signal to stop running.
+
+=cut
+
+has term_file => (
+  is  => 'ro',
+  isa => Maybe[Str],
+  required => $NOSIGNALS,
+);
+
 =head2 run_guard
 
 A Guard used to ensure signal handlers are restored when the object is destroyed.
@@ -57,7 +75,14 @@ Returns true while the service is running in the current process.
 
 =cut
 
-sub is_running { defined $_[0]->run_guard ? 1 : 0 }
+#sub is_running { defined $_[0]->run_guard ? 1 : 0 }
+
+sub is_running {
+  my $self = shift;
+  return 0 unless defined $self->run_guard;
+  return 0 if $self->term_file && path($self->term_file)->exists;
+  return 1;
+}
 
 =head2 start
 
@@ -71,18 +96,11 @@ sub start {
   my $self = shift;
   return if $self->is_running;
 
-  my @existing = grep { $SIG{$_} } @SIGNALS;
-  my %sig = %SIG;
-
-  $self->{run_guard} = guard {
-    undef $SIG{$_} foreach @SIGNALS; # remove our handlers
-    $SIG{$_} = $sig{$_} foreach @existing; # restore original handlers
-    undef %sig;
-  };
-
-  foreach my $signal (@SIGNALS) {
-    my $orig = $SIG{$signal};
-    $SIG{$signal} = sub { $self->stop; $orig && $orig->(@_); };
+  if ($self->term_file) {
+    $self->_install_timer;
+  }
+  else {
+    $self->_install_handlers;
   }
 
   $self->is_running;
@@ -96,6 +114,72 @@ will return false.
 
 =cut
 
-sub stop { undef $_[0]->{run_guard}; !$_[0]->is_running; }
+sub stop {
+  my $self = shift;
+  undef $self->{run_guard};
+  !$self->is_running;
+}
+
+=head2 signal
+
+Signals the process to stop running. If L</term_file> is set, this is done by
+creating a touch file. Otherwise, the caller is required to specify the pid of
+the process being signalled.
+
+=cut
+
+sub signal {
+  my $self = shift;
+
+  if ($self->term_file) {
+    path($self->term_file)->touch;
+  }
+  else {
+    my $pid = shift or croak 'expected $pid';
+    kill 'TERM', $pid;
+  }
+}
+
+#-------------------------------------------------------------------------------
+# Installs signal handlers for @SIGNALS and creates the run_guard.
+#-------------------------------------------------------------------------------
+sub _install_handlers {
+  my $self = shift;
+  my @existing = grep { $SIG{$_} } @SIGNALS;
+  my %sig = %SIG;
+
+  $self->{run_guard} = guard {
+    undef $SIG{$_} foreach @SIGNALS; # remove our handlers
+    $SIG{$_} = $sig{$_} foreach @existing; # restore original handlers
+    undef %sig;
+  };
+
+  foreach my $signal (@SIGNALS) {
+    my $orig = $SIG{$signal};
+    $SIG{$signal} = sub { $self->stop; $orig && $orig->(@_); };
+  }
+}
+
+#-------------------------------------------------------------------------------
+# Install an alarm timer and create the run_guard.
+#-------------------------------------------------------------------------------
+sub _install_timer {
+  my $self = shift;
+  my $file = path($self->term_file);
+  my $intvl = 250_000;
+
+  $self->{run_guard} = guard {
+    ualarm 0;
+    $file->remove;
+    undef $SIG{ALRM};
+  };
+
+  $SIG{ALRM} = sub {
+    $self->stop if $file->exists;
+    ualarm $intvl;
+  };
+
+  ualarm $intvl;
+}
 
 1;
