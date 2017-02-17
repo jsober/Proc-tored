@@ -8,7 +8,7 @@ use Carp;
 use Const::Fast;
 use Guard 'guard';
 use Path::Tiny 'path';
-use Time::HiRes 'ualarm';
+use Time::HiRes 'alarm';
 use Types::Standard -types;
 
 const our $NOSIGNALS => $^O eq 'MSWin32';
@@ -166,20 +166,20 @@ sub _install_handlers {
 sub _install_timer {
   my $self = shift;
   my $file = path($self->term_file);
-  my $intvl = 250_000;
+  my $intvl = 0.2;
 
   $self->{run_guard} = guard {
-    ualarm 0;
-    $file->remove;
+    alarm 0;
     undef $SIG{ALRM};
+    $file->remove;
   };
 
   $SIG{ALRM} = sub {
     $self->stop if $file->exists;
-    ualarm $intvl;
+    alarm $intvl;
   };
 
-  ualarm $intvl;
+  alarm $intvl;
 }
 
 1;
