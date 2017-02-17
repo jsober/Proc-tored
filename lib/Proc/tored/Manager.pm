@@ -150,14 +150,14 @@ sub service {
   return 0;
 }
 
-=head2 running_pid
+=head2 read_pid
 
 Returns the pid identified in the pid file. Returns 0 if the pid file does
 not exist or is empty.
 
 =cut
 
-sub running_pid {
+sub read_pid {
   my $self = shift;
   my $file = path($self->filepath);
   return 0 unless $file->is_file;
@@ -166,19 +166,54 @@ sub running_pid {
   return $pid || 0;
 }
 
-=head2 stop_running_process
+=head2 running_pid
 
-See L<Proc::tored::Role::Running/stop_running_process>. When called from this
-class, the C<$pid> parameter is provided via L</running_pid>.
+Returns the pid of an already-running process or 0 if the pid file does not
+exist, is empty, or the process identified by the pid does not exist or is not
+visible.
 
 =cut
 
-around stop_running_process => sub {
-  my $orig = shift;
+sub running_pid {
   my $self = shift;
-  my $pid  = $self->running_pid or return 0;
-  return $self->$orig($pid, @_);
-};
+  my $pid = $self->read_pid;
+  return 0 unless $pid;
+  return $pid if kill 0, $pid;
+  return 0;
+}
+
+=head2 stop_running_process
+
+Issues a C<SIGTERM> to the active process. Returns 0 immediately if the pid
+file does not exist or is empty. Otherwise, polls the running process until the
+OS reports that it is no longer able to receive signals (with `kill(0, $pid)`).
+
+Optional parameter C<$timeout> may be specified in fractional seconds, causing
+C<stop_running_process> to block up to (around) C<$timeout> seconds waiting for
+the signaled process to exit.
+
+Returns the pid of the completed process otherwise.
+
+=cut
+
+sub stop_running_process {
+  my ($self, $timeout, $sleep) = @_;
+  $sleep ||= 0.2;
+
+  my $pid = $self->running_pid || return 0;
+  return $self->stop if $pid == $$;
+
+  if (kill('TERM', $pid) > 0) {
+    if ($timeout) {
+      while (kill(0, $pid) && $timeout > 0) {
+        sleep $sleep;
+        $timeout -= $sleep;
+      }
+    }
+  }
+
+  !kill(0, $pid);
+}
 
 =head2 run_lock
 
@@ -196,10 +231,44 @@ L</service> is preferred to this method for most uses.
 
 sub run_lock {
   my $self = shift;
-  my $pid = $self->running_pid;
-  $pid && kill(0, $pid) && return; # pid points to running process
+  return if $self->running_pid;
 
-  # existing .lock file means another process came in ahead
+  my $file = path($self->filepath);
+
+  # Write pid to the pidfile
+  if ($self->with_lock(sub { $file->spew("$$\n") })) {
+    $self->start;
+
+    # Create guard object that releases the pidfile once out of scope
+    return guard {
+      $self->stop;
+      $file->append({truncate => 1});
+    };
+  }
+
+  return;
+}
+
+#-------------------------------------------------------------------------------
+# Calls $code while holding the lock, unlocking afterward. Returns true when
+# the lock is achieved and $code is called.
+#-------------------------------------------------------------------------------
+sub with_lock {
+  my ($self, $code) = @_;
+  my $lock = $self->_lock or return;
+  $code->();
+  undef $lock;
+  return 1;
+}
+
+#-------------------------------------------------------------------------------
+# Creates a .lock file based on $self->filepath. While the file exists, the
+# lock is considered to be held. Returns a Guard that removes the file.
+#-------------------------------------------------------------------------------
+sub _lock {
+  my $self = shift;
+
+  # Existing .lock file means another process came in ahead
   my $lock = path($self->filepath . '.lock');
   return if $lock->exists;
 
@@ -216,21 +285,17 @@ sub run_lock {
     };
 
   return unless $locked;
+  return guard { $self->_unlock };
+}
 
-  # remove the lock file when out of scope
-  scope_guard { $lock->remove };
-
-  # write pid to the pidfile
-  my $file = path($self->filepath);
-  $file->spew("$$\n");
-
-  $self->start;
-
-  # Create guard object that releases the pidfile once out of scope
-  return guard {
-    $self->stop;
-    $file->append({truncate => 1});
-  };
+#-------------------------------------------------------------------------------
+# Removes the .lock file.
+#-------------------------------------------------------------------------------
+sub _unlock {
+  my $self = shift;
+  my $lock = path($self->filepath . '.lock');
+  try { $lock->remove }
+  catch { carp "unable to remove lock file: $_" }
 }
 
 1;

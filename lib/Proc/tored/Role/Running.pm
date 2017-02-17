@@ -31,8 +31,9 @@ my @SIGNALS = qw(TERM INT PIPE HUP);
 
 Classes consuming this role are provided with controls to L</start> and
 L</stop> voluntarily, along with a C<SIGTERM> handler that is active while the
-class L</is_running>. If a C<SIGTERM> is received via another process (by
-calling L</stop_running_process>), the class will voluntarily L</stop> itself.
+class L</is_running>. If a C<SIGTERM> is received via another process (e.g., by
+calling L<Proc::tored::Manager/stop_running_process>), the class will
+voluntarily L</stop> itself.
 
 =head1 ATTRIBUTES
 
@@ -96,36 +97,5 @@ will return false.
 =cut
 
 sub stop { undef $_[0]->{run_guard}; !$_[0]->is_running; }
-
-=head2 stop_running_process
-
-Issues a C<SIGTERM> to the active process. Returns 0 immediately if the pid
-file does not exist or is empty. Otherwise, polls the running process until the
-OS reports that it is no longer able to receive signals (with `kill(0, $pid)`).
-
-Optional parameter C<$timeout> may be specified in fractional seconds, causing
-C<stop_running_process> to block up to (around) C<$timeout> seconds waiting for
-the signaled process to exit.
-
-Returns the pid of the completed process otherwise.
-
-=cut
-
-sub stop_running_process {
-  my ($self, $pid, $timeout, $sleep) = @_;
-  return 0 unless $pid;
-  $sleep ||= 0.2;
-
-  if (kill('TERM', $pid) > 0) {
-    if ($timeout) {
-      while (kill(0, $pid) && $timeout > 0) {
-        sleep $sleep;
-        $timeout -= $sleep;
-      }
-    }
-  }
-
-  !kill(0, $pid);
-}
 
 1;
