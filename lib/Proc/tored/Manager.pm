@@ -26,7 +26,7 @@ use warnings;
 use Moo;
 use Carp;
 use Fcntl qw(:flock :seek :DEFAULT);
-use Guard qw(guard scope_guard);
+use Guard qw(guard);
 use Path::Tiny qw(path);
 use Time::HiRes qw(sleep);
 use Try::Tiny;
@@ -124,16 +124,7 @@ See L<Proc::tored::Role::Running/is_running>.
 =head2 service
 
 Accepts a code ref which will be called repeatedly until it or L</is_running>
-return false. While the service is running, handlers for C<SIGTERM>, C<SIGINT>,
-C<SIGPIPE>, and C<SIGHUP> are installed. When one of these signals are
-received, L</is_running> will be set to false and service loop will
-self-terminate.
-
-Note that it is possible for a signal to arrive between the L</is_running>
-check and the execution of the code ref. If this is a concern for the caller,
-it is recommended that the code ref avoid blocking for long periods, such as
-extended C<sleep> times or long-running database queries which perl cannot
-interrupt.
+return false.
 
 Example using a pool of forked workers, an imaginary task queue, and a
 secondary condition that decides whether to stop running (aside from the
@@ -207,15 +198,19 @@ sub running_pid {
 
 =head2 stop_running_process
 
-Issues a C<SIGTERM> to the active process. Returns 0 immediately if the pid
+Signals a running instance to self-terminate. Returns 0 immediately if the pid
 file does not exist or is empty. Otherwise, polls the running process until the
 OS reports that it is no longer able to receive signals (with `kill(0, $pid)`).
 
 Optional parameter C<$timeout> may be specified in fractional seconds, causing
 C<stop_running_process> to block up to (around) C<$timeout> seconds waiting for
-the signaled process to exit.
+the signaled process to exit. Optional parameter C<$sleep> specifies the
+interval between polls in fractional seconds.
 
 Returns the pid of the completed process otherwise.
+
+  $service->stop_running_process; # signal running process and return
+  $service->stop_running_process(10, 0.5); # signal, then poll every 0.5s for 10s
 
 =cut
 
