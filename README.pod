@@ -76,10 +76,10 @@ file), returns the pid of that process. Returns 0 otherwise.
 
 =head2 zap
 
-Sends a C<SIGTERM> to a running instance of the service, causing it to
-self-terminate (assuming it is also C<Proc::tored>). Accepts an optional
-C<$timeout> in fractional seconds, causing C<zap> to wait up to C<$timeout>
-seconds for the process to exit.
+Signals a running instance of the service that it should self-terminate
+(assuming it is also C<Proc::tored>). Accepts an optional C<$timeout> in
+fractional seconds, causing C<zap> to wait up to C<$timeout> seconds for the
+process to exit.
 
   zap $service, 30
     or die 'timed out after 30s waiting for service to exit';
