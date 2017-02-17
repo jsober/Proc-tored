@@ -15,9 +15,11 @@ subtest 'service creation' => sub {
 
 subtest 'service' => sub {
   my $proctor = service $name, in $dir;
-  my $pid; my $count = 0;
-  run { $pid = running $proctor; ++$count < 4 } $proctor;
-  is $count, 4, 'expected work completed';
+  my $pid;
+  my $count = 0;
+  my $stop = 10;
+  run { $pid = running $proctor; ++$count < $stop } $proctor;
+  is $count, $stop, 'expected work completed';
   is $pid, $$, 'expected pid while running';
   is 0, running $proctor, 'no running pid';
 };
@@ -25,16 +27,18 @@ subtest 'service' => sub {
 subtest 'stop' => sub {
   my $proctor = service $name, in $dir;
   my $count = 0;
-  run { ++$count < 4 or stop $proctor } $proctor;
-  is $count, 4, 'expected work completed';
+  my $stop = 10;
+  run { ++$count < $stop or stop $proctor } $proctor;
+  is $count, $stop, 'expected work completed';
   is 0, running $proctor, 'no running pid';
 };
 
 subtest 'zap' => sub {
   my $proctor = service $name, in $dir;
   my $count = 0;
-  run { ++$count < 4 or zap $proctor } $proctor;
-  is $count, 4, 'expected work completed';
+  my $stop = 10;
+  run { ++$count < $stop or zap $proctor } $proctor;
+  is $count, $stop, 'expected work completed';
   is 0, running $proctor, 'no running pid';
 };
 

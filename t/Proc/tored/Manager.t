@@ -78,10 +78,6 @@ subtest 'signal' => sub {
     elsif ($i > 300) {
       die 'backstop activated'; # backstop
     }
-    # Yield so alarm can go off
-    elsif ($i > 3) {
-      sleep 1;
-    }
 
     return 1;
   };
