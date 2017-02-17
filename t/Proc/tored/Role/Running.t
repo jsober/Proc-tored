@@ -30,15 +30,22 @@ subtest 'sigterm' => sub {
   my $handled = 0;
   my $handler = $SIG{TERM} = sub { $handled = 1 };
 
-  my $runner = Runner->new;
-  $runner->start;
+  ok my $runner = Runner->new, 'new';
+  ok $runner->start, 'start';
 
   isnt $SIG{TERM}, $handler, 'handler overridden post start';
 
-  kill 'SIGTERM', $$;
+  # Fork a child process (or thread on mswin32/threaded) to sigterm us
+  my $pid = $$;
+  if (my $child = fork) {
+    waitpid $child, 0;
+  } else {
+    kill 'SIGTERM', $pid;
+    exit 0;
+  }
+
   ok !$runner->is_running, 'is_running post sigterm';
   ok $handled, 'overridden handler called on sigterm';
-
   is $SIG{TERM} || undef, $handler, 'overridden handler restored';
 };
 

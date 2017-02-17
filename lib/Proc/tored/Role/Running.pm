@@ -69,21 +69,21 @@ this method, L</is_running> will return true.
 
 sub start {
   my $self = shift;
-  my %sig = %SIG;
-  my @existing = grep { $sig{$_} } @SIGNALS;
+  return if $self->is_running;
 
-  foreach my $signal (@SIGNALS) {
-    $SIG{$signal} = sub {
-      $sig{$signal} && $sig{$signal}->(@_);
-      $self->stop;
-    };
-  }
+  my @existing = grep { $SIG{$_} } @SIGNALS;
+  my %sig = %SIG;
 
   $self->{run_guard} = guard {
     undef $SIG{$_} foreach @SIGNALS; # remove our handlers
     $SIG{$_} = $sig{$_} foreach @existing; # restore original handlers
     undef %sig;
   };
+
+  foreach my $signal (@SIGNALS) {
+    my $orig = $SIG{$signal};
+    $SIG{$signal} = sub { $self->stop; $orig && $orig->(@_); };
+  }
 
   $self->is_running;
 }
