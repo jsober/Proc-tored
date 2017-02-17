@@ -35,13 +35,13 @@ subtest 'sigterm' => sub {
 
   isnt $SIG{TERM}, $handler, 'handler overridden post start';
 
-  # Fork a child process (or thread on mswin32/threaded) to sigterm us
-  my $pid = $$;
-  if (my $child = fork) {
-    waitpid $child, 0;
-  } else {
-    kill 'SIGTERM', $pid;
-    exit 0;
+  if ($^O eq 'MSWin32') {
+    # Simulate a signal being received on mswin32+threads because only the parent
+    # process receives signals (in this case, the parent is `prove`).
+    $SIG{TERM}->();
+  }
+  else {
+    kill 'TERM', $$;
   }
 
   ok !$runner->is_running, 'is_running post sigterm';
