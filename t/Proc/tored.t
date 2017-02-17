@@ -37,13 +37,17 @@ subtest 'zap' => sub {
   my $proctor = service $name, in $dir;
   my $count = 0;
   my $stop = 10;
+  my $zapped = 0;
 
   run {
-      zap $proctor if ++$count == $stop;
+      if (++$count == $stop) {
+        $zapped = zap $proctor;
+      }
       die "backstop" if $count > $stop * 2;
       return $count;
     } $proctor;
 
+  ok $zapped, 'zapped';
   is $count, $stop, 'expected work completed';
   is 0, running $proctor, 'no running pid';
 };
