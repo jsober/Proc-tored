@@ -2,6 +2,9 @@ Proc::tored change log
 
 {{$NEXT}}
 
+- Refactor locking to support more platforms
+- Work around for MSWin32/threaded signal handling in unit tests
+
 0.04 2017-02-16
 
 - Use Path::Tiny->tempdir for pidfile directory in tests

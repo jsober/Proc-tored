@@ -84,6 +84,10 @@ seconds for the process to exit.
   zap $service, 30
     or die 'timed out after 30s waiting for service to exit';
 
+=head1 CAVEATS
+
+=head2 MSWin32
+
 =head1 AUTHOR
 
 Jeff Ober <jeffober@gmail.com>
