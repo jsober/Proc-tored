@@ -1,6 +1,5 @@
-Proc::tored change log
-
 {{$NEXT}}
+- Fixed serious bug causing pid file to be removed when a forked process exits
 
 0.06 2017-02-17
 - Use a touch file to signal self-termination
