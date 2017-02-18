@@ -2,10 +2,11 @@ use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
 use Path::Tiny 'path';
 
 my $dir = Path::Tiny->tempdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0);
-my $term = $dir->child("$$.term");
 skip_all 'could not create writable temp directory' unless -w $dir;
 
-ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => $dir), 'new';
+my $term = $dir->child("$$.term");
+
+ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
 ok !$proc->is_running, 'is_running false initially';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 

@@ -30,13 +30,9 @@ use Guard qw(guard);
 use Path::Tiny qw(path);
 use Time::HiRes qw(sleep);
 use Try::Tiny;
-use Type::Utils qw(declare as where);
-use Types::Standard qw(Str Bool Num is_CodeRef);
-
-my $NonEmptyStr = declare, as Str, where { $_ =~ /\S/ };
-my $Directory = declare, as $NonEmptyStr, where { -d $_ && -w $_ };
-
-with 'Proc::tored::Role::Running';
+use Types::Standard -all;
+use Proc::tored::Types -types;
+use Proc::tored::Flag;
 
 =head1 METHODS
 
@@ -58,12 +54,6 @@ pid file.
 A valid directory path where the pid file is to be created or an existing pid
 file is to be found.
 
-=item term_file
-
-A touch file is used to signal a process to self-terminate. The path to this
-file is automatically constructed from L</name> in L</dir> unless manually
-specified.
-
 =item lock_file
 
 Before writing the pid file, a lock is secured through the atomic creation of a
@@ -82,29 +72,19 @@ L</name> in L</dir>.
 
 has dir => (
   is  => 'ro',
-  isa => $Directory,
+  isa => Dir,
   required => 1,
 );
 
 has name => (
   is  => 'ro',
-  isa => $NonEmptyStr,
+  isa => NonEmptyStr,
   required => 1,
 );
 
-has '+term_file' => (
-  is => 'lazy',
-);
-
-sub _build_term_file {
-  my $self = shift;
-  my $file = path($self->dir)->child($self->name . '.term');
-  return "$file";
-}
-
 has pid_file => (
   is  => 'lazy',
-  isa => $NonEmptyStr,
+  isa => NonEmptyStr,
 );
 
 sub _build_pid_file {
@@ -115,7 +95,7 @@ sub _build_pid_file {
 
 has lock_file => (
   is  => 'lazy',
-  isa => $NonEmptyStr,
+  isa => NonEmptyStr,
 );
 
 sub _build_lock_file {
@@ -124,11 +104,27 @@ sub _build_lock_file {
   return "$file";
 }
 
+has term_flag => (
+  is  => 'lazy',
+  isa => InstanceOf['Proc::tored::Flag'],
+  handles => {
+    stop => 'unset',
+    start => 'set',
+    signal => 'signal',
+    is_running => 'is_set',
+  },
+);
+
+sub _build_term_flag {
+  my $self = shift;
+  my $file = path($self->dir)->child($self->name . '.term');
+  Proc::tored::Flag->new(touch_file_path => "$file");
+}
+
 =head2 is_running
 
-See L<Proc::tored::Role::Running/is_running>.
-
-=cut
+Returns true if the service has been started and the touch file used to signal
+the process to self-terminate does not exist.
 
 =head2 service
 

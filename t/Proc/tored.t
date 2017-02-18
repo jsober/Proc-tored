@@ -7,14 +7,14 @@ my $dir = Path::Tiny->tempdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0);
 skip_all 'could not create writable temp directory' unless -w $dir;
 
 subtest 'service creation' => sub {
-  my $proctor = service $name, in $dir;
+  my $proctor = service $name, in "$dir";
   is ref $proctor, 'Proc::tored::Manager', 'expected class';
   is $proctor->name, $name, 'expected name';
-  is $proctor->dir, $dir, 'expected dir';
+  is $proctor->dir, "$dir", 'expected dir';
 };
 
 subtest 'service' => sub {
-  my $proctor = service $name, in $dir;
+  my $proctor = service $name, in "$dir";
   my $pid;
   my $count = 0;
   my $stop = 10;
@@ -25,7 +25,7 @@ subtest 'service' => sub {
 };
 
 subtest 'stop' => sub {
-  my $proctor = service $name, in $dir;
+  my $proctor = service $name, in "$dir";
   my $count = 0;
   my $stop = 10;
   run { ++$count < $stop or stop $proctor } $proctor;
@@ -34,7 +34,7 @@ subtest 'stop' => sub {
 };
 
 subtest 'zap' => sub {
-  my $proctor = service $name, in $dir;
+  my $proctor = service $name, in "$dir";
   my $count = 0;
   my $stop = 10;
   my $zapped = 0;
