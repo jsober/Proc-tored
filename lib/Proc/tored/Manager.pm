@@ -60,14 +60,20 @@ file is to be found.
 
 =item term_file
 
-By default (and on supported platforms), posix signals are used to signal a
-managed process to voluntarily self-terminate. On non-compliant systems (e.g.
-MSWin32), a touch file is used instead. The path to this file is automatically
-constructed from L</name> in L</dir> unless manually specified.
+A touch file is used to signal a process to self-terminate. The path to this
+file is automatically constructed from L</name> in L</dir> unless manually
+specified.
 
-=item filepath
+=item lock_file
 
-Unless manually specified, the pid file's C<filepath> is constructed from
+Before writing the pid file, a lock is secured through the atomic creation of a
+lock file. If the file fails to be created (with O_EXCL), the lock fails.
+
+=cut
+
+=item pid_file
+
+Unless manually specified, the pid file's C<pid_file> is constructed from
 L</name> in L</dir>.
 
 =back
@@ -96,22 +102,25 @@ sub _build_term_file {
   return "$file";
 }
 
-=head2 filepath
-
-Returns the file system path created by concatenating the values of C<dir> and
-C<name> that were passed to C<new>.
-
-=cut
-
-has filepath => (
+has pid_file => (
   is  => 'lazy',
   isa => $NonEmptyStr,
-  init_arg => undef,
 );
 
-sub _build_filepath {
+sub _build_pid_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.pid');
+  return "$file";
+}
+
+has lock_file => (
+  is  => 'lazy',
+  isa => $NonEmptyStr,
+);
+
+sub _build_lock_file {
+  my $self = shift;
+  my $file = path($self->dir)->child($self->name . '.lock');
   return "$file";
 }
 
@@ -173,7 +182,7 @@ not exist or is empty.
 
 sub read_pid {
   my $self = shift;
-  my $file = path($self->filepath);
+  my $file = path($self->pid_file);
   return 0 unless $file->is_file;
   my ($line) = $file->lines({count => 1, chomp => 1}) or return 0;
   my ($pid) = $line =~ /^(\d+)$/;
@@ -221,7 +230,7 @@ sub stop_running_process {
   my $pid = $self->running_pid || return 0;
   return $self->stop if $pid == $$;
 
-  if ($self->signal > 0) {
+  if ($self->signal) {
     if ($timeout) {
       while (kill(0, $pid) && $timeout > 0) {
         sleep $sleep;
@@ -250,17 +259,21 @@ L</service> is preferred to this method for most uses.
 sub run_lock {
   my $self = shift;
   return if $self->running_pid;
+  my $pid = $$;
+  my $locked = $self->_lock;
 
-  my $file = path($self->filepath);
-
-  # Write pid to the pidfile
-  if ($self->with_lock(sub { $file->spew("$$\n") })) {
+  if ($locked) {
+    # Write pid to the pidfile
+    my $file = path($self->pid_file);
+    $file->spew("$pid\n");
     $self->start;
 
     # Create guard object that releases the pidfile once out of scope
     return guard {
-      $self->stop;
-      $file->append({truncate => 1});
+      if ($$ == $pid) {
+        $self->stop;
+        $file->append({truncate => 1});
+      }
     };
   }
 
@@ -268,26 +281,15 @@ sub run_lock {
 }
 
 #-------------------------------------------------------------------------------
-# Calls $code while holding the lock, unlocking afterward. Returns true when
-# the lock is achieved and $code is called.
-#-------------------------------------------------------------------------------
-sub with_lock {
-  my ($self, $code) = @_;
-  my $lock = $self->_lock or return;
-  $code->();
-  undef $lock;
-  return 1;
-}
-
-#-------------------------------------------------------------------------------
-# Creates a .lock file based on $self->filepath. While the file exists, the
+# Creates a .lock file based on $self->pid_file. While the file exists, the
 # lock is considered to be held. Returns a Guard that removes the file.
 #-------------------------------------------------------------------------------
 sub _lock {
   my $self = shift;
+  my $pid = $$;
 
   # Existing .lock file means another process came in ahead
-  my $lock = path($self->filepath . '.lock');
+  my $lock = path($self->lock_file);
   return if $lock->exists;
 
   my $locked = try {
@@ -303,7 +305,7 @@ sub _lock {
     };
 
   return unless $locked;
-  return guard { $self->_unlock };
+  return guard { $self->_unlock if $$ == $pid };
 }
 
 #-------------------------------------------------------------------------------
@@ -311,8 +313,7 @@ sub _lock {
 #-------------------------------------------------------------------------------
 sub _unlock {
   my $self = shift;
-  my $lock = path($self->filepath . '.lock');
-  try { $lock->remove }
+  try { path($self->lock_file)->remove }
   catch { carp "unable to remove lock file: $_" }
 }
 

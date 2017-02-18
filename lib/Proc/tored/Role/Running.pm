@@ -105,12 +105,10 @@ sub stop { $_[0]->{is_started} = 0; return 1 }
 
 =head2 signal
 
-Signals the process to stop running. If L</term_file> is set, this is done by
-creating a touch file. Otherwise, the caller is required to specify the pid of
-the process being signalled.
+Signals the process to stop running by creating a touch file.
 
 =cut
 
-sub signal { shift->_path->touch }
+sub signal { $_[0]->_path->touch->assert(sub { $_->exists }) }
 
 1;

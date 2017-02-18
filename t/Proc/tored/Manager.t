@@ -10,10 +10,11 @@ ok !$proc->is_running, 'is_running false initially';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 
 subtest 'run_lock' => sub {
-  my $path = path($proc->filepath);
+  my $path = path($proc->pid_file);
+  my $lock =  $proc->run_lock;
 
-  ok my $lock = $proc->run_lock, 'acquire run lock';
-  ok $path->is_file, 'pidfile created';
+  ok $lock, 'run lock';
+  ok $path->exists, 'pidfile created';
   is $proc->running_pid, $$, 'running_pid returns current pid';
   ok $proc->is_running, 'is_running true';
   ok !$proc->run_lock, 'run_lock returns false when lock already held';
