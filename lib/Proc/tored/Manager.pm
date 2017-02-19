@@ -132,9 +132,10 @@ has pause_flag => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::Flag'],
   handles => {
-    halt => 'unset',
+    hold => 'unset',
     resume => 'set',
     pause => 'signal',
+    unpause => 'clear',
   },
 );
 
@@ -186,7 +187,10 @@ sub service {
 
   if (my $guard = $self->run_lock) {
     while (1) {
-      last unless $self->is_running;
+      if (!$self->is_running) {
+        $self->term_flag->clear;
+        last;
+      }
 
       if ($self->is_paused) {
         sleep 0.2;

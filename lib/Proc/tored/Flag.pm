@@ -33,7 +33,6 @@ has flag => (
 sub set {
   my $self = shift;
   $self->{flag} = 1;
-  $self->clear;
   return 1;
 }
 

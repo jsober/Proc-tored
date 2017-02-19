@@ -31,7 +31,7 @@ subtest 'run service' => sub {
   my $i = 0;
   my $do_stuff = sub { ++$i % 3 != 0 };
 
-  ok my $service = $proc->service($do_stuff), 'run service';
+  ok $proc->service($do_stuff), 'run service';
   is $i, 3, 'service callback was called expected number of times';
 
   {
@@ -42,8 +42,6 @@ subtest 'run service' => sub {
 };
 
 subtest 'stop service' => sub {
-  my $service;
-
   my $i = 0;
   my $do_stuff = sub {
     if (++$i % 5 == 0) {
@@ -60,7 +58,7 @@ subtest 'stop service' => sub {
     return 1;
   };
 
-  ok $service = $proc->service($do_stuff), 'run service';
+  ok $proc->service($do_stuff), 'run service';
   is $i, 4, 'service stops when is_running is false';
 };
 
@@ -84,8 +82,20 @@ subtest 'signal' => sub {
     return 1;
   };
 
-  my $service = $proc->service($do_stuff);
+  ok $proc->service($do_stuff), 'run service';
   is $i, 3, 'service self-terminates after being signalled';
+};
+
+subtest 'pause' => sub {
+  ok !$proc->is_paused, '!is_paused';
+  ok $proc->hold, 'hold';
+  ok $proc->is_paused, 'is_paused';
+  ok $proc->resume, 'resume';
+  ok !$proc->is_paused, '!is_paused';
+  ok $proc->pause, 'pause';
+  ok $proc->is_paused, 'is_paused';
+  ok $proc->unpause, 'unpause';
+  $proc->resume;
 };
 
 done_testing;

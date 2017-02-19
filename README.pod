@@ -67,6 +67,20 @@ Tells the L</run> loop to shut down.
     return 1;
   } $service;
 
+=head2 hold
+
+While "on hold", the L</run> loop will pause, not executing the code ref until
+L</resume> is called.
+
+=head2 resume
+
+Ends the "on hold" condition, causing the loop to resume execution of the code
+ref.
+
+=head1 SERVICE CONTROL
+
+These functions control another running process.
+
 =head2 running
 
 If the supplied service is running as another process (as found in the pid
@@ -83,6 +97,14 @@ process to exit.
 
   zap $service, 30
     or die 'timed out after 30s waiting for service to exit';
+
+=head2 pause
+
+Creates a touch file that signals a running instance to pause.
+
+=head2 unpause
+
+Clears the touch file used to pause a running instance.
 
 =head1 AUTHOR
 

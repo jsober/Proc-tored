@@ -63,6 +63,20 @@ Tells the L</run> loop to shut down.
     return 1;
   } $service;
 
+=head2 hold
+
+While "on hold", the L</run> loop will pause, not executing the code ref until
+L</resume> is called.
+
+=head2 resume
+
+Ends the "on hold" condition, causing the loop to resume execution of the code
+ref.
+
+=head1 SERVICE CONTROL
+
+These functions control another running process.
+
 =head2 running
 
 If the supplied service is running as another process (as found in the pid
@@ -80,6 +94,14 @@ process to exit.
   zap $service, 30
     or die 'timed out after 30s waiting for service to exit';
 
+=head2 pause
+
+Creates a touch file that signals a running instance to pause.
+
+=head2 unpause
+
+Clears the touch file used to pause a running instance.
+
 =cut
 
 use parent 'Exporter';
@@ -87,21 +109,30 @@ use parent 'Exporter';
 our @EXPORT = qw(
   service
   in
+  pid
+  running
   run
   stop
-  running
   zap
+  hold
+  resume
+  pause
+  unpause
 );
 
 sub service ($%)  { Proc::tored::Manager->new(name => shift, @_) }
 sub in      ($;@) { dir => shift, @_ }
+
 sub pid     ($)   { $_[0]->read_pid }
 sub running ($)   { $_[0]->running_pid }
 sub run     (&$)  { $_[1]->service($_[0]) }
+
 sub stop    ($)   { $_[0]->stop }
 sub zap     ($;@) { shift->stop_running_process(@_) }
-sub pause   ($)   { $_[0]->pause }
+
+sub hold    ($)   { $_[0]->hold }
 sub resume  ($)   { $_[0]->resume }
-sub halt    ($)   { $_[0]->halt }
+sub pause   ($)   { $_[0]->pause }
+sub unpause ($)   { $_[0]->unpause }
 
 1;
