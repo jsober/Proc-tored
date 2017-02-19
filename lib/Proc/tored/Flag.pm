@@ -19,47 +19,33 @@ has file => (
   isa => InstanceOf['Path::Tiny'],
 );
 
-sub _build_file {
-  my $self = shift;
-  path($self->touch_file_path);
-}
+sub _build_file { path($_[0]->touch_file_path) }
 
-has flag => (
+has is_set => (
   is  => 'ro',
   isa => Bool,
   default => 0,
 );
 
+before is_set => sub { $_[0]->file->exists ? $_[0]->set : $_[0]->unset };
+
+sub is_not_set {
+  my $self = shift;
+  return !$self->is_set;
+}
+
 sub set {
   my $self = shift;
-  $self->{flag} = 1;
+  $self->file->touch;
+  $self->{is_set} = 1;
   return 1;
 }
 
 sub unset {
   my $self = shift;
-  $self->{flag} = 0;
-  return 1;
-}
-
-sub is_set {
-  my $self = shift;
-
-  if ($self->file->exists) {
-    $self->unset;
-  }
-
-  $self->flag;
-}
-
-sub clear {
-  my $self = shift;
   $self->file->remove;
-}
-
-sub signal {
-  my $self = shift;
-  $self->file->touch;
+  $self->{is_set} = 0;
+  return 1;
 }
 
 1;

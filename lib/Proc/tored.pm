@@ -13,9 +13,14 @@ require Proc::tored::Manager;
   my $service = service 'stuff-doer', in '/var/run';
 
   # Run service
-  run { do_stuff() or stop $service } $service
+  run { do_stuff() } $service
     or die 'existing process running under pid '
           . running $service;
+
+  # Pause the running process
+  pause $service;
+  sleep 30;
+  resume $service;
 
   # Terminate another running process, timing out after 15s
   zap $service, 15
@@ -27,80 +32,64 @@ A C<Proc::tored> service is voluntarily managed by a pid file and touch files.
 
 =head1 EXPORTED SUBROUTINES
 
-C<Proc::tored> is an C<Exporter>. All routines are exported by default.
+All routines are exported by default.
 
 =head2 service
 
-Defines the service by name. The pid file will be created as C<name.pid>.
-
-  my $service = service 'thing', ...;
+Creates a new service. The name given to the service is used in the naming of
+various files used to control the service.
 
 =head2 in
 
-Sets the directory where the pid file will be created.
+Selects the location where the service will look for the pid file and touch
+files used to control the service.
 
-  my $service = service 'thing', in '/var/run';
+=head2 pid
 
-=head2 run
-
-Starts the service loop, calling the supplied code block until it either
-returns false or the service is stopped (internally via L</stop> or externally
-via L</zap>).
-
-  run {
-    my $task = get_next_task() or return;
-    process_task($task);
-    return 1;
-  } $service;
-
-=head2 stop
-
-Tells the L</run> loop to shut down.
-
-  run {
-    my $task = get_next_task() or stop $service;
-    process_task($task);
-    return 1;
-  } $service;
-
-=head2 hold
-
-While "on hold", the L</run> loop will pause, not executing the code ref until
-L</resume> is called.
-
-=head2 resume
-
-Ends the "on hold" condition, causing the loop to resume execution of the code
-ref.
-
-=head1 SERVICE CONTROL
-
-These functions control another running process.
+Reads and returns the contents of the pid file. Does not check to determine
+whether the pid is valid. Returns 0 if the pid file is not found or is empty.
 
 =head2 running
 
-If the supplied service is running as another process (as found in the pid
-file), returns the pid of that process. Returns 0 otherwise.
-
-  zap $service if running $service;
+Reads and returns the contents of the pid file. If the pid cannot be signaled
+using `kill(0, $pid)`, returns 0.
 
 =head2 zap
 
-Signals a running instance of the service that it should self-terminate
-(assuming it is also C<Proc::tored>). Accepts an optional C<$timeout> in
-fractional seconds, causing C<zap> to wait up to C<$timeout> seconds for the
-process to exit.
+Blocks until a running service exits. Returns immediately if the L</running>
+service is the current process.
 
-  zap $service, 30
-    or die 'timed out after 30s waiting for service to exit';
+=head2 run
+
+Begins the service in the current process. The service, specified as a code
+block, will be called until it returns false or the L</stopped> flag is set.
+
+If the L</paused> flag is set, the loop will continue to run without executing
+the code block until it has been L</resume>d.
+
+=head2 stop
+
+Sets the "stopped" flag for the service.
+
+=head2 start
+
+Clears the "stopped" flag for the service.
+
+=head2 stopped
+
+Returns true if the "stopped" flag has been set.
 
 =head2 pause
 
-Creates a touch file that signals a running instance to pause.
+Sets the "paused" flag for the service.
 
-=head2 unpause
+=head2 resume
 
-Clears the touch file used to pause a running instance.
+Clears the "paused" flag for the service.
+
+=head2 paused
+
+Returns true if the "paused" flag has been set.
 
 =cut
 
@@ -109,15 +98,19 @@ use parent 'Exporter';
 our @EXPORT = qw(
   service
   in
+
   pid
   running
-  run
-  stop
   zap
-  hold
-  resume
+  run
+
+  stop
+  start
+  stopped
+
   pause
-  unpause
+  resume
+  paused
 );
 
 sub service ($%)  { Proc::tored::Manager->new(name => shift, @_) }
@@ -125,14 +118,15 @@ sub in      ($;@) { dir => shift, @_ }
 
 sub pid     ($)   { $_[0]->read_pid }
 sub running ($)   { $_[0]->running_pid }
+sub zap     ($;@) { shift->stop_wait(@_) }
 sub run     (&$)  { $_[1]->service($_[0]) }
 
 sub stop    ($)   { $_[0]->stop }
-sub zap     ($;@) { shift->stop_running_process(@_) }
+sub start   ($)   { $_[0]->start }
+sub stopped ($)   { $_[0]->is_stopped }
 
-sub hold    ($)   { $_[0]->hold }
-sub resume  ($)   { $_[0]->resume }
 sub pause   ($)   { $_[0]->pause }
-sub unpause ($)   { $_[0]->unpause }
+sub resume  ($)   { $_[0]->resume }
+sub paused  ($)   { $_[0]->is_paused }
 
 1;

@@ -11,7 +11,7 @@ package Proc::tored::Manager;
 
   # Signal another process running this service to quit gracefully, throwing an
   # error if it does not self-terminate after 15 seconds.
-  if (my $pid = $proctor->stop_running_process(15)) {
+  if (my $pid = $proctor->stop_wait(15)) {
     die "process $pid is being stubborn!";
   }
 
@@ -59,8 +59,6 @@ file is to be found.
 Before writing the pid file, a lock is secured through the atomic creation of a
 lock file. If the file fails to be created (with O_EXCL), the lock fails.
 
-=cut
-
 =item pid_file
 
 Unless manually specified, the pid file's C<pid_file> is constructed from
@@ -104,60 +102,92 @@ sub _build_lock_file {
   return "$file";
 }
 
-has term_flag => (
+has stop_flag => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::Flag'],
   handles => {
-    stop => 'unset',
-    start => 'set',
-    signal => 'signal',
-    is_running => 'is_set',
+    stop => 'set',
+    start => 'unset',
+    is_stopped => 'is_set',
   },
 );
 
-sub _build_term_flag {
+sub _build_stop_flag {
   my $self = shift;
-  my $file = path($self->dir)->child($self->name . '.term');
+  my $file = path($self->dir)->child($self->name . '.stopped');
   Proc::tored::Flag->new(touch_file_path => "$file");
 }
-
-=head2 is_running
-
-Returns true if the service has been started and the touch file used to signal
-the process to self-terminate does not exist.
-
-=cut
 
 has pause_flag => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::Flag'],
   handles => {
-    hold => 'unset',
-    resume => 'set',
-    pause => 'signal',
-    unpause => 'clear',
+    pause => 'set',
+    resume => 'unset',
+    is_paused => 'is_set',
   },
 );
 
 sub _build_pause_flag {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.paused');
-  my $flag = Proc::tored::Flag->new(touch_file_path => "$file");
-  return $flag;
+  Proc::tored::Flag->new(touch_file_path => "$file");
 }
+
+=head1 METHODS
+
+=head2 stop
+
+Sets the "stopped" flag for the service.
+
+=head2 start
+
+Clears the "stopped" flag for the service.
+
+=head2 is_stopped
+
+Returns true if the "stopped" flag has been set.
+
+=head2 pause
+
+Sets the "paused" flag for the service.
+
+=head2 resume
+
+Clears the "paused" flag for the service.
 
 =head2 is_paused
 
-Returns true if the service has been paused.
+Returns true if the "paused" flag has been set.
+
+=head2 clear_flags
+
+Clears both the "stopped" and "paused" flags.
 
 =cut
 
-sub is_paused { !$_[0]->pause_flag->is_set }
+sub clear_flags {
+  my $self = shift;
+  $self->start;
+  $self->resume;
+}
+
+=head2 is_running
+
+Returns true if the current process is the active, running process.
+
+=cut
+
+sub is_running {
+  my $self = shift;
+  return $self->running_pid == $$;
+}
 
 =head2 service
 
-Accepts a code ref which will be called repeatedly until it or L</is_running>
-return false.
+Accepts a code ref which will be called repeatedly until it returns false or
+the "stopped" flag is set. If the "paused" flag is set, will continue to rune
+but will not execute the code block until the "paused" flag has been cleared.
 
 Example using a pool of forked workers, an imaginary task queue, and a
 secondary condition that decides whether to stop running.
@@ -186,12 +216,7 @@ sub service {
   die 'expected a CODE ref' unless is_CodeRef($code);
 
   if (my $guard = $self->run_lock) {
-    while (1) {
-      if (!$self->is_running) {
-        $self->term_flag->clear;
-        last;
-      }
-
+    until ($self->is_stopped) {
       if ($self->is_paused) {
         sleep 0.2;
         next;
@@ -238,38 +263,27 @@ sub running_pid {
   return 0;
 }
 
-=head2 stop_running_process
+=head2 stop_wait
 
-Signals a running instance to self-terminate. Returns 0 immediately if the pid
-file does not exist or is empty. Otherwise, polls the running process until the
-OS reports that it is no longer able to receive signals (with `kill(0, $pid)`).
+Sets the "stopped" flag and blocks until the L<running_pid> exits or the
+C<$timeout> is reached.
 
-Optional parameter C<$timeout> may be specified in fractional seconds, causing
-C<stop_running_process> to block up to (around) C<$timeout> seconds waiting for
-the signaled process to exit. Optional parameter C<$sleep> specifies the
-interval between polls in fractional seconds.
-
-Returns the pid of the completed process otherwise.
-
-  $service->stop_running_process; # signal running process and return
-  $service->stop_running_process(10, 0.5); # signal, then poll every 0.5s for 10s
+  $service->stop_wait(30); # stop and block for up to 30 seconds
 
 =cut
 
-sub stop_running_process {
+sub stop_wait {
   my ($self, $timeout, $sleep) = @_;
   $sleep ||= 0.2;
 
-  my $pid = $self->running_pid || return 0;
-  return $self->stop if $pid == $$;
+  $self->stop;
+  return if $self->is_running;
 
-  if ($self->signal) {
-    if ($timeout) {
-      while (kill(0, $pid) && $timeout > 0) {
-        sleep $sleep;
-        $timeout -= $sleep;
-      }
-    }
+  my $pid = $self->running_pid || return 0;
+
+  while (kill(0, $pid) && $timeout > 0) {
+    sleep $sleep;
+    $timeout -= $sleep;
   }
 
   !kill(0, $pid);
@@ -278,9 +292,8 @@ sub stop_running_process {
 =head2 run_lock
 
 Attempts to atomically acquire the run lock. Once held, the pid file is created
-(if needed) and the current process' pid is written to it, L</is_running> will
-return true and a signal handlers will be active. Existing handlers will be
-executed after the one assigned for the run lock.
+if needed, the current process' pid is written to it, and L</is_stopped> will
+return false.
 
 If the lock is acquired, a L<Guard> object is returned that will release the
 lock once out of scope. Returns undef otherwise.
@@ -291,23 +304,19 @@ L</service> is preferred to this method for most uses.
 
 sub run_lock {
   my $self = shift;
-  return if $self->running_pid;
-  my $pid = $$;
+  return if $self->is_running;
+
   my $locked = $self->_lock;
 
   if ($locked) {
     # Write pid to the pidfile
     my $file = path($self->pid_file);
-    $file->spew("$pid\n");
-    $self->start;
-    $self->resume;
+    $file->spew("$$\n");
 
     # Create guard object that releases the pidfile once out of scope
     return guard {
-      if ($$ == $pid) {
-        $self->stop;
-        $file->append({truncate => 1});
-      }
+      $file->append({truncate => 1})
+        if $self->is_running;
     };
   }
 
@@ -320,7 +329,6 @@ sub run_lock {
 #-------------------------------------------------------------------------------
 sub _lock {
   my $self = shift;
-  my $pid = $$;
 
   # Existing .lock file means another process came in ahead
   my $lock = path($self->lock_file);
@@ -339,7 +347,7 @@ sub _lock {
     };
 
   return unless $locked;
-  return guard { $self->_unlock if $$ == $pid };
+  return guard { $self->_unlock if $self->is_running };
 }
 
 #-------------------------------------------------------------------------------

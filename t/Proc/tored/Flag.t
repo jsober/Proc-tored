@@ -6,19 +6,15 @@ skip_all 'could not create writable temp directory' unless -w $dir;
 my $path = $dir->child('flag');
 
 ok my $flag = $CLASS->new(touch_file_path => "$path"), 'new';
-ok !$flag->file->exists, '!exists';
 ok !$flag->is_set, '!is_set';
+ok !$flag->file->exists, '!file->exists';
 
 ok $flag->set, 'set';
 ok $flag->is_set, 'is_set';
+ok $flag->file->exists, 'file->exists';
 
 ok $flag->unset, 'unset';
 ok !$flag->is_set, '!is_set';
-
-ok $flag->set, 'set';
-ok $flag->signal, 'signal';
-ok !$flag->is_set, '!is_set';
-
-ok $flag->clear, 'clear';
+ok !$flag->file->exists, '!file->exists';
 
 done_testing;

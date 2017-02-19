@@ -6,9 +6,50 @@ skip_all 'could not create writable temp directory' unless -w $dir;
 
 my $term = $dir->child("$$.term");
 
+
+sub counter($\$%) {
+  my ($proc, $acc, %flag) = @_;
+  my $backstop = 10;
+  my $count = 0;
+
+  return sub {
+    $$acc = ++$count;
+
+    if ($count >= $backstop) {
+      diag "backstop reached ($backstop)";
+      $proc->stop;
+      return;
+    }
+
+    return $flag{$count}->($count)
+      if $flag{$count};
+
+    return 1;
+  };
+}
+
+
 ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
-ok !$proc->is_running, 'is_running false initially';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
+ok !$proc->is_running, '!is_running';
+ok !$proc->is_stopped, '!is_stopped';
+ok !$proc->is_paused, '!is_paused';
+
+subtest 'start/stop' => sub {
+  ok $proc->start, 'start';
+  ok !$proc->is_stopped, '!is_stopped';
+  ok $proc->stop, 'stop';
+  ok $proc->is_stopped, 'is_stopped';
+  $proc->clear_flags;
+};
+
+subtest 'pause/resume' => sub {
+  ok $proc->pause, 'pause';
+  ok $proc->is_paused, 'is_paused';
+  ok $proc->resume, 'resume';
+  ok !$proc->is_paused, '!is_paused';
+  $proc->clear_flags;
+};
 
 subtest 'run_lock' => sub {
   my $path = path($proc->pid_file);
@@ -27,75 +68,34 @@ subtest 'run_lock' => sub {
   ok !$proc->is_running, 'is_running false after guard out of scope';
 };
 
-subtest 'run service' => sub {
-  my $i = 0;
-  my $do_stuff = sub { ++$i % 3 != 0 };
+subtest 'service' => sub {
+  subtest 'start' => sub {
+    $proc->clear_flags;
 
-  ok $proc->service($do_stuff), 'run service';
-  is $i, 3, 'service callback was called expected number of times';
+    my $acc = 0;
+    my $counter = counter $proc, $acc, 3 => sub { 0 };
+    ok $proc->service($counter), 'run service';
+    is $acc, 3, 'service callback was called expected number of times';
+    ok !$proc->is_stopped, '!is_stopped';
+    ok !$proc->is_paused, '!is_paused';
 
-  {
-    my $lock = $proc->run_lock;
-    ok !$proc->service($do_stuff), 'service returns false when cannot acquire lock';
-    $i = 0; is $i, 0, 'service callback is not called when service fails to acquire lock';
-  };
-};
+    subtest 'negative path' => sub {
+      my $lock = $proc->run_lock;
 
-subtest 'stop service' => sub {
-  my $i = 0;
-  my $do_stuff = sub {
-    if (++$i % 5 == 0) {
-      return 0;
-    }
-
-    if ($i % 4 == 0) {
-      $proc->stop;
-    }
-    elsif ($i >= 10) {
-      die 'backstop activated';
-    }
-
-    return 1;
+      $acc = 0;
+      ok !$proc->service($counter), 'service returns false when cannot acquire lock';
+      is $acc, 0, 'service callback is not called when service fails to acquire lock';
+    };
   };
 
-  ok $proc->service($do_stuff), 'run service';
-  is $i, 4, 'service stops when is_running is false';
-};
+  subtest 'stop' => sub {
+    $proc->clear_flags;
 
-subtest 'signal' => sub {
-  my $i = 0;
-
-  my $do_stuff = sub {
-    # Increment test value
-    if ($i < 3) {
-      ++$i;
-    }
-    # Signal service to stop
-    elsif ($i == 3) {
-      $proc->signal($$);
-    }
-    # Failsafe
-    elsif ($i > 300) {
-      die 'backstop activated'; # backstop
-    }
-
-    return 1;
+    my $acc = 0;
+    my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
+    ok $proc->service($counter), 'run service';
+    is $acc, 3, 'service self-terminates after being signalled';
   };
-
-  ok $proc->service($do_stuff), 'run service';
-  is $i, 3, 'service self-terminates after being signalled';
-};
-
-subtest 'pause' => sub {
-  ok !$proc->is_paused, '!is_paused';
-  ok $proc->hold, 'hold';
-  ok $proc->is_paused, 'is_paused';
-  ok $proc->resume, 'resume';
-  ok !$proc->is_paused, '!is_paused';
-  ok $proc->pause, 'pause';
-  ok $proc->is_paused, 'is_paused';
-  ok $proc->unpause, 'unpause';
-  $proc->resume;
 };
 
 done_testing;
