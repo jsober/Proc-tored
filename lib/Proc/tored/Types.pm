@@ -3,8 +3,7 @@ package Proc::tored::Types;
 
 use strict;
 use warnings;
-use Proc::tored::Pool::Constants ':events';
-use Types::Standard -types;
+use Types::Standard 'Str';
 use Type::Utils -all;
 use Type::Library -base,
   -declare => qw(
