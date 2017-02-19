@@ -95,10 +95,13 @@ our @EXPORT = qw(
 
 sub service ($%)  { Proc::tored::Manager->new(name => shift, @_) }
 sub in      ($;@) { dir => shift, @_ }
-sub run     (&$)  { $_[1]->service($_[0]) }
-sub stop    ($)   { $_[0]->stop }
 sub pid     ($)   { $_[0]->read_pid }
 sub running ($)   { $_[0]->running_pid }
+sub run     (&$)  { $_[1]->service($_[0]) }
+sub stop    ($)   { $_[0]->stop }
 sub zap     ($;@) { shift->stop_running_process(@_) }
+sub pause   ($)   { $_[0]->pause }
+sub resume  ($)   { $_[0]->resume }
+sub halt    ($)   { $_[0]->halt }
 
 1;

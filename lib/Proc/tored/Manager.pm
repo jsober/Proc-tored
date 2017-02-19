@@ -126,14 +126,40 @@ sub _build_term_flag {
 Returns true if the service has been started and the touch file used to signal
 the process to self-terminate does not exist.
 
+=cut
+
+has pause_flag => (
+  is  => 'lazy',
+  isa => InstanceOf['Proc::tored::Flag'],
+  handles => {
+    halt => 'unset',
+    resume => 'set',
+    pause => 'signal',
+  },
+);
+
+sub _build_pause_flag {
+  my $self = shift;
+  my $file = path($self->dir)->child($self->name . '.paused');
+  my $flag = Proc::tored::Flag->new(touch_file_path => "$file");
+  return $flag;
+}
+
+=head2 is_paused
+
+Returns true if the service has been paused.
+
+=cut
+
+sub is_paused { !$_[0]->pause_flag->is_set }
+
 =head2 service
 
 Accepts a code ref which will be called repeatedly until it or L</is_running>
 return false.
 
 Example using a pool of forked workers, an imaginary task queue, and a
-secondary condition that decides whether to stop running (aside from the
-built-in signal handlers):
+secondary condition that decides whether to stop running.
 
   $proctor->service(sub {
     # Wait for an available worker, but with a timeout
@@ -159,8 +185,15 @@ sub service {
   die 'expected a CODE ref' unless is_CodeRef($code);
 
   if (my $guard = $self->run_lock) {
-    while ($self->is_running && $code->()) {
-      ;
+    while (1) {
+      last unless $self->is_running;
+
+      if ($self->is_paused) {
+        sleep 0.2;
+        next;
+      }
+
+      last unless $code->();
     }
 
     return 1;
@@ -263,6 +296,7 @@ sub run_lock {
     my $file = path($self->pid_file);
     $file->spew("$pid\n");
     $self->start;
+    $self->resume;
 
     # Create guard object that releases the pidfile once out of scope
     return guard {
