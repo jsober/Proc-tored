@@ -198,7 +198,7 @@ resume>).
   # Allow service to resume execution
   resume $service;
 
-=head1 PID FILES
+=head1 PID FILE
 
 A pid file is used to identify a running service. While the service is running,
 barring any outside interference, the pid will contain the pid of the running
