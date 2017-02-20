@@ -36,19 +36,21 @@ ok !$proc->is_stopped, '!is_stopped';
 ok !$proc->is_paused, '!is_paused';
 
 subtest 'start/stop' => sub {
-  ok $proc->start, 'start';
   ok !$proc->is_stopped, '!is_stopped';
+  ok !$proc->start, '!start';
   ok $proc->stop, 'stop';
   ok $proc->is_stopped, 'is_stopped';
-  $proc->clear_flags;
+  ok $proc->start, 'start';
+  ok !$proc->is_stopped, '!is_stopped';
 };
 
 subtest 'pause/resume' => sub {
+  ok !$proc->is_paused, '!is_paused';
+  ok !$proc->resume, '!resume';
   ok $proc->pause, 'pause';
   ok $proc->is_paused, 'is_paused';
   ok $proc->resume, 'resume';
   ok !$proc->is_paused, '!is_paused';
-  $proc->clear_flags;
 };
 
 subtest 'run_lock' => sub {

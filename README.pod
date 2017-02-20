@@ -21,12 +21,18 @@ version 0.08
     or die 'existing process running under pid '
           . running $service;
 
-  # Pause the running process
-  pause $service;
-  sleep 30;
-  resume $service;
+  # Pause and resume a running process
+  if (paused $service) {
+    do_stuff_while_paused();
+    resume $service;
+  }
+  else {
+    pause $service;
+    do_stuff_while_paused();
+    resume $service;
+  }
 
-  # Terminate another running process, timing out after 15s
+  # Terminate a running process, timing out after 15s
   zap $service, 15
     or die 'stuff_doer pid ' . running $service . ' is being stubborn';
 
@@ -34,34 +40,54 @@ version 0.08
 
 A C<Proc::tored> service is voluntarily managed by a pid file and touch files.
 
+=head1 PID FILES
+
+A pid file is used to identify a running service. While the service is running,
+barring any outside interference, the pid will contain the pid of the running
+process and a newline. After the service process stops, the pid file will be
+truncated. The file will be located in the directory specified by L</in>. Its
+name will be the concatenation of the service name and ".pid".
+
+=head1 STATE FLAGS
+
+State flags are persistent until unset. Their status is determined by the
+existence of a touch file.
+
+=head2 stopped
+
+=head2 paused
+
 =head1 EXPORTED SUBROUTINES
 
 All routines are exported by default.
 
 =head2 service
 
-Creates a new service. The name given to the service is used in the naming of
-various files used to control the service.
-
 =head2 in
 
-Selects the location where the service will look for the pid file and touch
-files used to control the service.
+A proctored service is defined using the C<service> function. The name given to
+the service is used in the naming of various files used to control the service
+(e.g., pid file and touch files). The C<in> function is used to specify the
+local directory where these files will be created and looked for.
+
+  my $service = service 'name-of-service', in '/var/run';
 
 =head2 pid
 
 Reads and returns the contents of the pid file. Does not check to determine
 whether the pid is valid. Returns 0 if the pid file is not found or is empty.
 
+  printf "service may be running under pid %d", pid $service;
+
 =head2 running
 
-Reads and returns the contents of the pid file. If the pid cannot be signaled
-using `kill(0, $pid)`, returns 0.
+Reads and returns the contents of the pid file. Essentially the same as
+C<kill(0, pid $service)>. Returns 0 if the pid is not found or cannot be
+signalled.
 
-=head2 zap
-
-Blocks until a running service exits. Returns immediately if the L</running>
-service is the current process.
+  if (my $pid = running $service) {
+    warn "service is already running under pid $pid";
+  }
 
 =head2 run
 
@@ -71,29 +97,82 @@ block, will be called until it returns false or the L</stopped> flag is set.
 If the L</paused> flag is set, the loop will continue to run without executing
 the code block until it has been L</resume>d.
 
-=head2 stop
+  my $started = time;
+  my $max_run_time = 300;
 
-Sets the "stopped" flag for the service.
+  run {
+    if (time - $started > $max_run_time) {
+      warn "Max run time ($max_run_time seconds) exceeded\n";
+      warn "  -shutting down\n";
+      return 0;
+    }
+    else {
+      do_some_work();
+    }
+
+    return 1;
+  } $service;
+
+=head2 zap
+
+Sets the "stopped" flag (see L</stop>), then blocks until a running service
+exits. Returns immediately (after setting the "stopped" flag) if the
+L</running> service is the current process.
+
+  sub stop_service {
+    if (my $pid = running $service) {
+      print "Attempting to stop running service running under process $pid\n";
+
+      if (zap $pid, 30) {
+        print "  -Service shut down\n";
+        return 1;
+      }
+      else {
+        print "  -Timed out before service shut down\n";
+        return 0;
+      }
+    }
+  }
+
+=head2 stop
 
 =head2 start
 
-Clears the "stopped" flag for the service.
-
 =head2 stopped
 
-Returns true if the "stopped" flag has been set.
+Controls and inspects the "stopped" flag for the service.
+
+  # Stop a running service
+  if (!stopped $service && running $service) {
+    stop $service;
+  }
+
+  do_work_while_stopped();
+
+  # Allow service to start
+  # Note that this does not launch the service process. It simply clears the
+  # "stopped" flag that would have prevented it from running again.
+  start $service;
 
 =head2 pause
 
-Sets the "paused" flag for the service.
-
 =head2 resume
-
-Clears the "paused" flag for the service.
 
 =head2 paused
 
-Returns true if the "paused" flag has been set.
+Controls and inspects the "paused" flag for the service.
+
+  # Pause a running service
+  # Note that the running service will not exit. Instead, it will stop
+  # executing its main loop until the "paused" flag is cleared.
+  if (!paused $service && running $service) {
+    pause $service;
+  }
+
+  do_work_while_paused();
+
+  # Allow service to resume execution
+  resume $service;
 
 =head1 AUTHOR
 
