@@ -100,9 +100,9 @@ whether the pid is valid. Returns 0 if the pid file is not found or is empty.
 
 =head2 running
 
-Reads and returns the contents of the pid file. Essentially the same as
-C<kill(0, pid $service)>. Returns 0 if the pid is not found or cannot be
-signalled.
+Reads and returns the contents of the pid file after checking that the process
+identified still exists. Essentially the same as C<kill(0, pid $service)>.
+Returns 0 if the pid is not found or cannot be signalled.
 
   if (my $pid = running $service) {
     warn "service is already running under pid $pid";
