@@ -16,19 +16,21 @@ version 0.08
   use Getopt::Long;
 
   my %opt = (
-    start  => 0,
-    stop   => 0,
-    zap    => 0,
     pause  => 0,
     resume => 0,
+    stop   => 0,
+    zap    => 0,
+    start  => 0,
+    run    => 0,
   );
 
   GetOptions(
-    'start'  => \$opt{start},
-    'stop'   => \$opt{stop},
-    'zap'    => \$opt{zap},
     'pause'  => \$opt{pause},
     'resume' => \$opt{resume},
+    'stop'   => \$opt{stop},
+    'zap'    => \$opt{zap},
+    'start'  => \$opt{start},
+    'run'    => \$opt{run},
   );
 
   my $service = service 'stuff-doer', in '/var/run';
@@ -38,23 +40,30 @@ version 0.08
     if $pid;
 
   if ($opt{pause}) {
-    # Set the paused flag
+    # Set the paused flag, causing a running service to block until unset
     pause $service;
   }
   elsif ($opt{resume}) {
-    # Unset the paused flag
+    # Unset the paused flag, unblocking any running service
     resume $service;
   }
   elsif ($opt{stop}) {
+    # Set the stopped state, preventing new processes from starting the service
+    # and causing running processes to self-terminate
     stop $service;
   }
   elsif ($opt{zap}) {
     # Terminate a running process, timing out after 15s
     zap $service, 15
-      or die 'stuff_doer pid ' . running $service . ' is being stubborn';
+      or die "stuff_doer $pid is being stubborn";
   }
   elsif ($opt{start}) {
-    # Run service
+    # Allow the service to start running again
+    start $service;
+  }
+
+  if ($opt{run}) {
+    # Run service (if not stopped)
     run { do_stuff() } $service;
   }
 
