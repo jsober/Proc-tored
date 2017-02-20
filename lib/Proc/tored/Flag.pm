@@ -1,5 +1,24 @@
 package Proc::tored::Flag;
-# ABSTRACT: thing
+# ABSTRACT: Ties a runtime flag to the existence of a touch file
+
+=head1 SYNOPSIS
+
+  use Proc::tored::Flag;
+
+  my $fnord = Proc::tored::Flag->new(touch_file_path => '/my/service/path');
+
+  $fnord->set; # touch file created if not already there
+  $fnord->is_set; # true
+
+  $fnord->unset; # touch file removed if it exists
+  $fnord->is_set; # false
+
+  if ($fnord->is_set) {
+    warn "forgot what to do";
+    exit 1;
+  }
+
+=cut
 
 use strict;
 use warnings;
