@@ -19,11 +19,11 @@ A C<Str> that contains at least one non-whitespace character.
 
 =head2 Dir
 
-A L</NonEmptyStr> that is a valid directory path.
+A L</NonEmptyStr> that is a valid, writable directory path.
 
 =cut
 
 declare NonEmptyStr, as Str, where { $_ =~ /\S/ };
-declare Dir, as NonEmptyStr, where { -d $_ };
+declare Dir, as NonEmptyStr, where { -d $_ && -w $_ };
 
 1;
