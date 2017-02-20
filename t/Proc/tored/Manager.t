@@ -36,6 +36,7 @@ ok !$proc->is_stopped, '!is_stopped';
 ok !$proc->is_paused, '!is_paused';
 
 subtest 'start/stop' => sub {
+  $proc->clear_flags;
   ok !$proc->is_stopped, '!is_stopped';
   ok !$proc->start, '!start';
   ok $proc->stop, 'stop';
@@ -45,6 +46,7 @@ subtest 'start/stop' => sub {
 };
 
 subtest 'pause/resume' => sub {
+  $proc->clear_flags;
   ok !$proc->is_paused, '!is_paused';
   ok !$proc->resume, '!resume';
   ok $proc->pause, 'pause';
@@ -54,14 +56,15 @@ subtest 'pause/resume' => sub {
 };
 
 subtest 'run_lock' => sub {
+  $proc->clear_flags;
   my $path = path($proc->pid_file);
-  my $lock =  $proc->run_lock;
+  my $lock = $proc->run_lock;
 
   ok $lock, 'run lock';
   ok $path->exists, 'pidfile created';
   is $proc->running_pid, $$, 'running_pid returns current pid';
   ok $proc->is_running, 'is_running true';
-  ok !$proc->run_lock, 'run_lock returns false when lock already held';
+  ok !$proc->run_lock, '!run_lock while is_running';
 
   undef $lock;
 
@@ -73,30 +76,36 @@ subtest 'run_lock' => sub {
 subtest 'service' => sub {
   subtest 'start' => sub {
     $proc->clear_flags;
-
     my $acc = 0;
     my $counter = counter $proc, $acc, 3 => sub { 0 };
     ok $proc->service($counter), 'run service';
     is $acc, 3, 'service callback was called expected number of times';
     ok !$proc->is_stopped, '!is_stopped';
     ok !$proc->is_paused, '!is_paused';
-
-    subtest 'negative path' => sub {
-      my $lock = $proc->run_lock;
-
-      $acc = 0;
-      ok !$proc->service($counter), 'service returns false when cannot acquire lock';
-      is $acc, 0, 'service callback is not called when service fails to acquire lock';
-    };
   };
 
   subtest 'stop' => sub {
     $proc->clear_flags;
-
     my $acc = 0;
     my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
     ok $proc->service($counter), 'run service';
     is $acc, 3, 'service self-terminates after being signalled';
+  };
+
+  subtest 'cooperation' => sub {
+    $proc->clear_flags;
+    my $acc = 0;
+    my $recursive_start = 0;
+
+    my $counter = counter $proc, $acc,
+      1 => sub {
+        $proc->service(sub { $recursive_start = 1; return 0 });
+        return 0;
+      };
+
+    ok $proc->service($counter), 'run service';
+    is $acc, 1, 'stopped when expected';
+    ok !$recursive_start, 'second process did not start while first was running';
   };
 };
 

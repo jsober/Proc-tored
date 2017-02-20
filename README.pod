@@ -13,49 +13,59 @@ version 0.08
 =head1 SYNOPSIS
 
   use Proc::tored;
+  use Getopt::Long;
+
+  my %opt = (
+    start  => 0,
+    stop   => 0,
+    zap    => 0,
+    pause  => 0,
+    resume => 0,
+  );
+
+  GetOptions(
+    'start'  => \$opt{start},
+    'stop'   => \$opt{stop},
+    'zap'    => \$opt{zap},
+    'pause'  => \$opt{pause},
+    'resume' => \$opt{resume},
+  );
 
   my $service = service 'stuff-doer', in '/var/run';
+  my $pid = running $service;
 
-  # Run service
-  run { do_stuff() } $service
-    or die 'existing process running under pid '
-          . running $service;
+  print "Running service found with pid $pid\n"
+    if $pid;
 
-  # Pause and resume a running process
-  if (paused $service) {
-    do_stuff_while_paused();
-    resume $service;
-  }
-  else {
+  if ($opt{pause}) {
+    # Set the paused flag
     pause $service;
-    do_stuff_while_paused();
+  }
+  elsif ($opt{resume}) {
+    # Unset the paused flag
     resume $service;
   }
-
-  # Terminate a running process, timing out after 15s
-  zap $service, 15
-    or die 'stuff_doer pid ' . running $service . ' is being stubborn';
+  elsif ($opt{stop}) {
+    stop $service;
+  }
+  elsif ($opt{zap}) {
+    # Terminate a running process, timing out after 15s
+    zap $service, 15
+      or die 'stuff_doer pid ' . running $service . ' is being stubborn';
+  }
+  elsif ($opt{start}) {
+    # Run service
+    run { do_stuff() } $service;
+  }
 
 =head1 DESCRIPTION
 
 A C<Proc::tored> service is voluntarily managed by a pid file and touch files.
 
-=head1 PID FILES
-
-A pid file is used to identify a running service. While the service is running,
-barring any outside interference, the pid will contain the pid of the running
-process and a newline. After the service process stops, the pid file will be
-truncated. The file will be located in the directory specified by L</in>. Its
-name will be the concatenation of the service name and ".pid".
-
-=head1 STATE FLAGS
-
-State flags are persistent until unset. Their status is determined by the
-existence of a touch file.
-
-=head2 stopped
-
-=head2 paused
+C<Proc::tored> services are specified with a name and a path. Any services
+created using the same name and path are considered the same service and will
+be aware of other processes via their L</PID FILE> and respect service control
+L</FLAGS>.
 
 =head1 EXPORTED SUBROUTINES
 
@@ -95,7 +105,14 @@ Begins the service in the current process. The service, specified as a code
 block, will be called until it returns false or the L</stopped> flag is set.
 
 If the L</paused> flag is set, the loop will continue to run without executing
-the code block until it has been L</resume>d.
+the code block until it has been L</resume>d. If the L</paused> flag is set at
+the time C<run> is called, the loop will start but will not begin executing the
+code block until the flag is cleared.
+
+If the L</stopped> flag is set, the loop will terminate at the completion of
+the current iteration. If the L</stopped> flag is set at the time C<run> is
+called, C<run> will return false immediately. The behavior under L</stopped>
+takes priority over that of L</paused>.
 
   my $started = time;
   my $max_run_time = 300;
@@ -160,7 +177,9 @@ Controls and inspects the "stopped" flag for the service.
 
 =head2 paused
 
-Controls and inspects the "paused" flag for the service.
+Controls and inspects the "paused" flag for the service. In general, this
+should never be done inside the L</run> loop (see the warning in L</Pause and
+resume>).
 
   # Pause a running service
   # Note that the running service will not exit. Instead, it will stop
@@ -173,6 +192,63 @@ Controls and inspects the "paused" flag for the service.
 
   # Allow service to resume execution
   resume $service;
+
+=head1 PID FILES
+
+A pid file is used to identify a running service. While the service is running,
+barring any outside interference, the pid will contain the pid of the running
+process and a newline. After the service process stops, the pid file will be
+truncated. The file will be located in the directory specified by L</in>. Its
+name is the concatenation of the service name and ".pid".
+
+=head1 FLAGS
+
+Service control flags are persistent until unset. Their status is determined by
+the existence of a touch file.
+
+=head2 stopped
+
+A touch file indicating that a running service should self-terminate and that
+new processes should not start is created with L</stop> and removed with
+L</start>. It is located in the directory specified by L</in>. Its name is the
+concatenation of the service name and ".stopped".
+
+=head2 paused
+
+A touch file indicating that a running service should temporarily stop
+executing and that new processes should start but not yet execute any service
+code is created with L</pause> and removed with L</resume>. It is located in
+the directory specified by L</in>. Its name is the concatenation of the service
+name and ".paused".
+
+=head1 BUGS AND LIMITATIONS
+
+=head2 Pause and resume
+
+When a service is L</paused>, the code block passed to L</run> is no longer
+executed until I<something> calls L</resume>. This can lead to deadlock if
+there is no external actor willing to L</resume> the service.
+
+For example, this service will never resume:
+
+  run {
+    my $empty = out_of_tasks();
+
+    if ($empty) {
+      pause $service;
+    }
+    elsif (paused $service && !$empty) {
+      # This line is never reached because this code block is no longer
+      # executed after being paused above.
+      resume $service;
+    }
+
+    do_next_task();
+    return 1;
+  } $service;
+
+In most cases, pausing and resuming a service should be handled from outside of
+L</run>.
 
 =head1 AUTHOR
 

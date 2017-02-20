@@ -213,6 +213,8 @@ secondary condition that decides whether to stop running.
 
 sub service {
   my ($self, $code) = @_;
+  return 0 if $self->is_stopped;
+  return 0 if $self->running_pid;
   die 'expected a CODE ref' unless is_CodeRef($code);
 
   if (my $guard = $self->run_lock) {
@@ -289,18 +291,17 @@ sub stop_wait {
   !kill(0, $pid);
 }
 
-=head2 run_lock
-
-Attempts to atomically acquire the run lock. Once held, the pid file is created
-if needed, the current process' pid is written to it, and L</is_stopped> will
-return false.
-
-If the lock is acquired, a L<Guard> object is returned that will release the
-lock once out of scope. Returns undef otherwise.
-
-L</service> is preferred to this method for most uses.
-
-=cut
+#-------------------------------------------------------------------------------
+# Attempts to atomically acquire the run lock. Once held, the pid file is created
+# if needed, the current process' pid is written to it.
+#
+# If the lock is acquired, a L<Guard> object is returned that will release the
+# lock once out of scope. Returns undef otherwise.
+#
+# This method is I<not> used to determine if there is an existing process
+# running. It is I<only> used to safely manage the pid file while running.
+# service() should instead be used for coordinated launch of a service.
+#-------------------------------------------------------------------------------
 
 sub run_lock {
   my $self = shift;
