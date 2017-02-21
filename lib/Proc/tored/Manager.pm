@@ -44,27 +44,25 @@ method.
 
 =over
 
+=cut
+
 =item name
 
-The file name to be used when creating or accessing the service's associated
-pid file.
+The name of the service. Services created with an identical L</name> and
+L</dir> will use the same pid file and share flags.
+
+=cut
+
+has name => (
+  is  => 'ro',
+  isa => NonEmptyStr,
+  required => 1,
+);
 
 =item dir
 
-A valid directory path where the pid file is to be created or an existing pid
-file is to be found.
-
-=item lock_file
-
-Before writing the pid file, a lock is secured through the atomic creation of a
-lock file. If the file fails to be created (with O_EXCL), the lock fails.
-
-=item pid_file
-
-Unless manually specified, the pid file's C<pid_file> is constructed from
-L</name> in L</dir>.
-
-=back
+A valid run directory (C</var/run> is a common choice). The path must be
+writable.
 
 =cut
 
@@ -74,11 +72,11 @@ has dir => (
   required => 1,
 );
 
-has name => (
-  is  => 'ro',
-  isa => NonEmptyStr,
-  required => 1,
-);
+=item pid_file
+
+Unless manually specified, the pid file's path is L</dir>/L</name>.pid.
+
+=cut
 
 has pid_file => (
   is  => 'lazy',
@@ -91,14 +89,20 @@ sub _build_pid_file {
   return "$file";
 }
 
-has lock_file => (
-  is  => 'lazy',
+=item stop_file
+
+Unless manually specified, the stop file's path is L</dir>/L</name>.stopped.
+
+=cut
+
+has stop_file => (
+  is => 'lazy',
   isa => NonEmptyStr,
 );
 
-sub _build_lock_file {
+sub _build_stop_file {
   my $self = shift;
-  my $file = path($self->dir)->child($self->name . '.lock');
+  my $file = path($self->dir)->child($self->name . '.stopped');
   return "$file";
 }
 
@@ -114,8 +118,26 @@ has stop_flag => (
 
 sub _build_stop_flag {
   my $self = shift;
-  my $file = path($self->dir)->child($self->name . '.stopped');
-  Proc::tored::Flag->new(touch_file_path => "$file");
+  Proc::tored::Flag->new(touch_file_path => $self->stop_file);
+}
+
+=item pause_file
+
+Unless manually specified, the pause file's path is L</dir>/L</name>.paused.
+
+=back
+
+=cut
+
+has pause_file => (
+  is => 'lazy',
+  isa => NonEmptyStr,
+);
+
+sub _build_pause_file {
+  my $self = shift;
+  my $file = path($self->dir)->child($self->name . '.paused');
+  return "$file";
 }
 
 has pause_flag => (
@@ -130,35 +152,40 @@ has pause_flag => (
 
 sub _build_pause_flag {
   my $self = shift;
-  my $file = path($self->dir)->child($self->name . '.paused');
-  Proc::tored::Flag->new(touch_file_path => "$file");
+  Proc::tored::Flag->new(touch_file_path => $self->pause_file);
+}
+
+has lock_file => (
+  is  => 'lazy',
+  isa => NonEmptyStr,
+  init_arg => undef,
+);
+
+sub _build_lock_file {
+  my $self = shift;
+  my $file = path($self->dir)->child($self->name . '.lock');
+  return "$file";
 }
 
 =head1 METHODS
 
 =head2 stop
 
-Sets the "stopped" flag for the service.
-
 =head2 start
-
-Clears the "stopped" flag for the service.
 
 =head2 is_stopped
 
-Returns true if the "stopped" flag has been set.
+Controls and inspects the "stopped" flag. While stopped, the L</service> loop
+will refuse to run.
 
 =head2 pause
 
-Sets the "paused" flag for the service.
-
 =head2 resume
-
-Clears the "paused" flag for the service.
 
 =head2 is_paused
 
-Returns true if the "paused" flag has been set.
+Controls and inspects the "paused" flag. While paused, the L</service> loop
+will continue to run but will not execute the code block passed in.
 
 =head2 clear_flags
 
@@ -302,7 +329,6 @@ sub stop_wait {
 # running. It is I<only> used to safely manage the pid file while running.
 # service() should instead be used for coordinated launch of a service.
 #-------------------------------------------------------------------------------
-
 sub run_lock {
   my $self = shift;
   return if $self->is_running;

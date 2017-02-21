@@ -1,4 +1,5 @@
 {{$NEXT}}
+- Added Proc::tored::Manager->stop_file and ->pause_file to override touch file paths
 
 0.08 2017-02-20
 - Service state is now persistent
