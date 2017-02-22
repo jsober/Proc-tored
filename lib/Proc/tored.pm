@@ -80,12 +80,15 @@ All routines are exported by default.
 
 =head2 in
 
+=head2 trap
+
 A proctored service is defined using the C<service> function. The name given to
 the service is used in the naming of various files used to control the service
 (e.g., pid file and touch files). The C<in> function is used to specify the
-local directory where these files will be created and looked for.
+local directory where these files will be created and looked for. Signals may
+be trapped using C<trap> on non-C<MSWin32> systems.
 
-  my $service = service 'name-of-service', in '/var/run';
+  my $service = service 'name-of-service', in '/var/run', trap ['TERM', 'INT'];
 
 =head2 pid
 
@@ -262,6 +265,7 @@ use parent 'Exporter';
 our @EXPORT = qw(
   service
   in
+  trap
 
   pid
   running
@@ -279,6 +283,7 @@ our @EXPORT = qw(
 
 sub service ($%)  { Proc::tored::Manager->new(name => shift, @_) }
 sub in      ($;@) { dir => shift, @_ }
+sub trap    ($)   { trap_signals => shift, @_ }
 
 sub pid     ($)   { $_[0]->read_pid }
 sub running ($)   { $_[0]->running_pid }

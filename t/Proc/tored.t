@@ -7,8 +7,14 @@ skip_all 'could not create writable temp directory' unless -w $dir;
 
 my $name = 'proc-tored-test';
 
+subtest 'param shortcuts' => sub {
+  is [in 'foo', 'bar', 'baz'], [qw(dir foo bar baz)], 'in';
+  is [trap ['foo'], 'bar', 'baz'], ['trap_signals', ['foo'], 'bar', 'baz'], 'trap_signals';
+};
+
 subtest 'service' => sub {
   my $proctor = service $name, in "$dir";
+  $proctor->clear_flags;
   is ref $proctor, 'Proc::tored::Manager', 'expected class';
   is $proctor->name, $name, 'expected name';
   is $proctor->dir, "$dir", 'expected dir';
@@ -26,6 +32,7 @@ subtest 'service' => sub {
 
 subtest 'stop' => sub {
   my $proctor = service $name, in "$dir";
+  $proctor->clear_flags;
   my $count = 0;
   my $stop = 4;
 
@@ -33,6 +40,30 @@ subtest 'stop' => sub {
 
   is $count, $stop, 'expected work completed';
   is running $proctor, 0, 'no running pid';
+};
+
+SKIP: {
+  skip 'signals not supported for MSWin32' if $^O eq 'MSWin32';
+
+  subtest 'signal' => sub {
+    my $proctor = service $name, in "$dir", trap ['INT'];
+    $proctor->clear_flags;
+
+    is $proctor->trap_signals, ['INT'], 'trap_signals';
+
+    my $count = 0;
+    my $stop  = 4;
+
+    run {
+      if (++$count == $stop) {
+        kill 'INT', $$;
+      }
+      $count < 10
+    } $proctor;
+
+    is $count, $stop, 'expected work completed';
+    is running $proctor, 0, 'no running pid';
+  };
 };
 
 done_testing;

@@ -29,7 +29,7 @@ sub counter($\$%) {
 }
 
 
-ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
+ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir", trap_signals => ['INT']), 'new';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 ok !$proc->is_running, '!is_running';
 ok !$proc->is_stopped, '!is_stopped';
@@ -106,6 +106,21 @@ subtest 'service' => sub {
     ok $proc->service($counter), 'run service';
     is $acc, 1, 'stopped when expected';
     ok !$recursive_start, 'second process did not start while first was running';
+  };
+
+  SKIP: {
+    skip 'signals not supported for MSWin32' if $^O eq 'MSWin32';
+
+    subtest 'signals' => sub {
+      $proc->clear_flags;
+      my $acc = 0;
+      my $counter = counter $proc, $acc,
+        3  => sub { kill 'INT', $$ },
+        10 => sub { $proc->stop };
+
+      ok $proc->service($counter), 'run service';
+      is $acc, 3, 'stopped when expected';
+    };
   };
 };
 

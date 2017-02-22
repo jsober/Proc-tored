@@ -125,8 +125,6 @@ sub _build_stop_flag {
 
 Unless manually specified, the pause file's path is L</dir>/L</name>.paused.
 
-=back
-
 =cut
 
 has pause_file => (
@@ -155,6 +153,19 @@ sub _build_pause_flag {
   Proc::tored::Flag->new(touch_file_path => $self->pause_file);
 }
 
+=item trap_signals
+
+An optional array of signals (suitable for use in C<%SIG>) allowed to end the
+L</service> loop. Unless specified, no signal handlers are installed.
+
+=cut
+
+has trap_signals => (
+  is  => 'ro',
+  isa => SignalList,
+  default => sub {[]},
+);
+
 has lock_file => (
   is  => 'lazy',
   isa => NonEmptyStr,
@@ -166,6 +177,8 @@ sub _build_lock_file {
   my $file = path($self->dir)->child($self->name . '.lock');
   return "$file";
 }
+
+=back
 
 =head1 METHODS
 
@@ -245,7 +258,12 @@ sub service {
   die 'expected a CODE ref' unless is_CodeRef($code);
 
   if (my $guard = $self->run_lock) {
-    until ($self->is_stopped) {
+    my $signalled = 0;
+
+    $SIG{$_} = sub { $signalled = 1 }
+      foreach @{$self->trap_signals};
+
+    until ($signalled || $self->is_stopped) {
       if ($self->is_paused) {
         sleep 0.2;
         next;
@@ -253,6 +271,9 @@ sub service {
 
       last unless $code->();
     }
+
+    undef $SIG{$_}
+      foreach @{$self->trap_signals};
 
     return 1;
   }
