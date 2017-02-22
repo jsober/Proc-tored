@@ -1,4 +1,5 @@
 {{$NEXT}}
+- Remove pidfile after service completes
 
 0.09 2017-02-21
 - Added Proc::tored::Manager->stop_file and ->pause_file to override touch file paths

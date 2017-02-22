@@ -68,7 +68,7 @@ subtest 'run_lock' => sub {
 
   undef $lock;
 
-  ok $path->is_file, 'pidfile remains after guard out of scope';
+  ok !$path->is_file, 'pidfile removed after guard out of scope';
   is $proc->running_pid, 0, 'running_pid returns 0 after guard out of scope';
   ok !$proc->is_running, 'is_running false after guard out of scope';
 };
