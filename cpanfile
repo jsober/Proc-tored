@@ -6,6 +6,7 @@ requires 'Moo'             => 0;
 requires 'Moo::Role'       => 0;
 requires 'Path::Tiny'      => 0.097;
 requires 'Time::HiRes'     => 0;
+requires 'Try::Tiny'       => 0;
 requires 'Type::Tiny'      => 0;
 requires 'Types::Standard' => 0;
 
