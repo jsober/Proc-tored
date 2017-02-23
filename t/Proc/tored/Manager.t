@@ -29,7 +29,7 @@ sub counter($\$%) {
 }
 
 
-ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir", trap_signals => ['INT']), 'new';
+ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 ok !$proc->is_running, '!is_running';
 ok !$proc->is_stopped, '!is_stopped';
@@ -110,6 +110,7 @@ subtest 'service' => sub {
 
   SKIP: {
     skip 'signals not supported for MSWin32' if $^O eq 'MSWin32';
+    $proc->{trap_signals} = ['INT'];
 
     subtest 'signals' => sub {
       $proc->clear_flags;

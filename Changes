@@ -1,4 +1,7 @@
 {{$NEXT}}
+- Fixed bug in definition of SignalList type
+- Fixed test failures on MSWin32
+- Added test for Proc::tored::Types
 
 0.10 2017-02-22
 - Remove pidfile after service completes

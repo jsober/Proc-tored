@@ -28,8 +28,8 @@ An array ref of strings suitable for use in C<%SIG>, except on MSWin32 systems.
 
 =cut
 
-declare NonEmptyStr, as Str, where { $_ =~ /\S/ };
+declare NonEmptyStr, as Str, where { $_ =~ /\S/sm };
 declare Dir, as NonEmptyStr, where { -d $_ && -w $_ };
-declare SignalList, as ArrayRef[Str], where { @$_ || $^O ne 'MSWin32' };
+declare SignalList, as ArrayRef[Str], where { @$_ == 0 || $^O ne 'MSWin32' };
 
 1;
