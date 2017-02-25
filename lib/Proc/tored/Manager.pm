@@ -362,7 +362,13 @@ sub run_lock {
     $file->spew("$$\n");
 
     # Create guard object that releases the pidfile once out of scope
-    return guard { $file->remove if $self->is_running };
+    return guard {
+      if ($self->is_running) {
+        $file->append({truncate => 1});
+        try { $file->remove }
+        catch { warn "error unlinking $file: $_" }
+      }
+    };
   }
 
   return;

@@ -8,7 +8,7 @@ Proc::tored - Service management using a pid file and touch files
 
 =head1 VERSION
 
-version 0.11
+version 0.12
 
 =head1 SYNOPSIS
 
