@@ -83,7 +83,7 @@ Unless manually specified, the pid file's path is L</dir>/L</name>.pid.
 has pid_file => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::PidFile'],
-  handles => [qw(running_pid is_running read_pid write_pid clear_pid)],
+  handles => [qw(running_pid is_running read_pid lock)],
 );
 
 sub _build_pid_file {
@@ -228,7 +228,7 @@ sub service {
   my ($self, $code) = @_;
   return 0 if $self->running_pid;
 
-  if (my $lock = $self->pid_file->write_pid) {
+  if (my $lock = $self->pid_file->lock) {
     my $service = $self->machine->service($code);
 
     while ($service->()) {

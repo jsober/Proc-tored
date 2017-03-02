@@ -63,26 +63,32 @@ sub read_pid {
 
 sub write_pid {
   my $self = shift;
-  my $lock = $self->lock or return 0;
+  my $lock = $self->write_lock or return 0;
   return 0 if $self->running_pid;
   $self->file->spew("$$\n");
-  return guard { $self->clear_pid };
+  return 1;
 }
 
 sub clear_pid {
   my $self = shift;
-  my $lock = $self->lock or return;
+  my $lock = $self->write_lock or return;
   return unless $self->is_running;
   $self->file->append({truncate => 1});
   try { $self->file->remove }
   catch { warn "error unlinking pid file: $_" }
 }
 
+sub lock {
+  my $self = shift;
+  return guard { $self->clear_pid } if $self->write_pid;
+  return;
+}
+
 #-------------------------------------------------------------------------------
 # Creates a .lock file based on $self->pid_file. While the file exists, the
 # lock is considered to be held. Returns a Guard that removes the file.
 #-------------------------------------------------------------------------------
-sub lock {
+sub write_lock {
   my $self = shift;
 
   # Existing .lock file means another process came in ahead
