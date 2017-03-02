@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.12 2017-03-02
 - On service shutdown, truncate pid file before removing in case there are open
   handles in other processes
 
