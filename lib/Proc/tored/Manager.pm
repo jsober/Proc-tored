@@ -31,9 +31,10 @@ use Path::Tiny qw(path);
 use Time::HiRes qw(sleep);
 use Try::Tiny;
 use Types::Standard -all;
-use Proc::tored::Types -types;
 use Proc::tored::Flag;
 use Proc::tored::Machine;
+use Proc::tored::PidFile;
+use Proc::tored::Types -types;
 
 =head1 METHODS
 
@@ -81,13 +82,14 @@ Unless manually specified, the pid file's path is L</dir>/L</name>.pid.
 
 has pid_file => (
   is  => 'lazy',
-  isa => NonEmptyStr,
+  isa => InstanceOf['Proc::tored::PidFile'],
+  handles => [qw(running_pid is_running read_pid write_pid clear_pid)],
 );
 
 sub _build_pid_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.pid');
-  return "$file";
+  Proc::tored::PidFile->new(file_path => "$file");
 }
 
 =item stop_file
@@ -190,18 +192,9 @@ will continue to run but will not execute the code block passed in.
 
 Clears both the "stopped" and "paused" flags.
 
-=cut
-
 =head2 is_running
 
 Returns true if the current process is the active, running process.
-
-=cut
-
-sub is_running {
-  my $self = shift;
-  return $self->running_pid == $$;
-}
 
 =head2 service
 
@@ -235,7 +228,7 @@ sub service {
   my ($self, $code) = @_;
   return 0 if $self->running_pid;
 
-  if (my $guard = $self->run_lock) {
+  if (my $lock = $self->pid_file->write_pid) {
     my $service = $self->machine->service($code);
 
     while ($service->()) {
@@ -253,32 +246,11 @@ sub service {
 Returns the pid identified in the pid file. Returns 0 if the pid file does
 not exist or is empty.
 
-=cut
-
-sub read_pid {
-  my $self = shift;
-  my $file = path($self->pid_file);
-  return 0 unless $file->is_file;
-  my ($line) = $file->lines({count => 1, chomp => 1}) or return 0;
-  my ($pid) = $line =~ /^(\d+)$/;
-  return $pid || 0;
-}
-
 =head2 running_pid
 
 Returns the pid of an already-running process or 0 if the pid file does not
 exist, is empty, or the process identified by the pid does not exist or is not
 visible.
-
-=cut
-
-sub running_pid {
-  my $self = shift;
-  my $pid = $self->read_pid;
-  return 0 unless $pid;
-  return $pid if kill 0, $pid;
-  return 0;
-}
 
 =head2 stop_wait
 
@@ -290,91 +262,10 @@ C<$timeout> is reached.
 =cut
 
 sub stop_wait {
-  my ($self, $timeout, $sleep) = @_;
-  $sleep ||= 0.2;
-
+  my $self = shift;
   $self->stop;
   return if $self->is_running;
-
-  my $pid = $self->running_pid || return 0;
-
-  while (kill(0, $pid) && $timeout > 0) {
-    sleep $sleep;
-    $timeout -= $sleep;
-  }
-
-  !kill(0, $pid);
-}
-
-#-------------------------------------------------------------------------------
-# Attempts to atomically acquire the run lock. Once held, the pid file is created
-# if needed, the current process' pid is written to it.
-#
-# If the lock is acquired, a L<Guard> object is returned that will release the
-# lock once out of scope. Returns undef otherwise.
-#
-# This method is I<not> used to determine if there is an existing process
-# running. It is I<only> used to safely manage the pid file while running.
-# service() should instead be used for coordinated launch of a service.
-#-------------------------------------------------------------------------------
-sub run_lock {
-  my $self = shift;
-  return if $self->is_running;
-
-  my $locked = $self->_lock;
-
-  if ($locked) {
-    # Write pid to the pidfile
-    my $file = path($self->pid_file);
-    $file->spew("$$\n");
-
-    # Create guard object that releases the pidfile once out of scope
-    return guard {
-      if ($self->is_running) {
-        $file->append({truncate => 1});
-        try { $file->remove }
-        catch { warn "error unlinking $file: $_" }
-      }
-    };
-  }
-
-  return;
-}
-
-#-------------------------------------------------------------------------------
-# Creates a .lock file based on $self->pid_file. While the file exists, the
-# lock is considered to be held. Returns a Guard that removes the file.
-#-------------------------------------------------------------------------------
-sub _lock {
-  my $self = shift;
-
-  # Existing .lock file means another process came in ahead
-  my $lock = path($self->lock_file);
-  return if $lock->exists;
-
-  my $locked = try {
-      $lock->filehandle({exclusive => 1}, '>');
-    }
-    catch {
-      # Rethrow if error was something other than the file already existing.
-      # Assume any 'sysopen' error matching 'File exists' is an indication
-      # of that.
-      die $_
-        unless $_->{op} eq 'sysopen' && $_->{err} =~ /File exists/i
-            || $lock->exists;
-    };
-
-  return unless $locked;
-  return guard { $self->_unlock if $self->is_running };
-}
-
-#-------------------------------------------------------------------------------
-# Removes the .lock file.
-#-------------------------------------------------------------------------------
-sub _unlock {
-  my $self = shift;
-  try { path($self->lock_file)->remove }
-  catch { carp "unable to remove lock file: $_" }
+  $self->pid_file->wait(@_);
 }
 
 1;

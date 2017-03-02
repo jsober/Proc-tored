@@ -55,16 +55,16 @@ subtest 'pause/resume' => sub {
   ok !$proc->is_paused, '!is_paused';
 };
 
-subtest 'run_lock' => sub {
+subtest 'run lock' => sub {
   $proc->clear_flags;
-  my $path = path($proc->pid_file);
-  my $lock = $proc->run_lock;
+  my $path = $proc->pid_file->file;
+  my $lock = $proc->write_pid;
 
   ok $lock, 'run lock';
   ok $path->exists, 'pidfile created';
   is $proc->running_pid, $$, 'running_pid returns current pid';
   ok $proc->is_running, 'is_running true';
-  ok !$proc->run_lock, '!run_lock while is_running';
+  ok !$proc->write_pid, '!run_lock while is_running';
 
   undef $lock;
 
