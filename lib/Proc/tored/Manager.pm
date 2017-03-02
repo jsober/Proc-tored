@@ -33,6 +33,7 @@ use Try::Tiny;
 use Types::Standard -all;
 use Proc::tored::Types -types;
 use Proc::tored::Flag;
+use Proc::tored::Machine;
 
 =head1 METHODS
 
@@ -106,21 +107,6 @@ sub _build_stop_file {
   return "$file";
 }
 
-has stop_flag => (
-  is  => 'lazy',
-  isa => InstanceOf['Proc::tored::Flag'],
-  handles => {
-    stop => 'set',
-    start => 'unset',
-    is_stopped => 'is_set',
-  },
-);
-
-sub _build_stop_flag {
-  my $self = shift;
-  Proc::tored::Flag->new(touch_file_path => $self->stop_file);
-}
-
 =item pause_file
 
 Unless manually specified, the pause file's path is L</dir>/L</name>.paused.
@@ -136,21 +122,6 @@ sub _build_pause_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.paused');
   return "$file";
-}
-
-has pause_flag => (
-  is  => 'lazy',
-  isa => InstanceOf['Proc::tored::Flag'],
-  handles => {
-    pause => 'set',
-    resume => 'unset',
-    is_paused => 'is_set',
-  },
-);
-
-sub _build_pause_flag {
-  my $self = shift;
-  Proc::tored::Flag->new(touch_file_path => $self->pause_file);
 }
 
 =item trap_signals
@@ -176,6 +147,21 @@ sub _build_lock_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.lock');
   return "$file";
+}
+
+has machine => (
+  is  => 'lazy',
+  isa => InstanceOf['Proc::tored::Machine'],
+  handles => [qw(stop start is_stopped pause resume is_paused clear_flags)],
+);
+
+sub _build_machine {
+  my $self = shift;
+  Proc::tored::Machine->new(
+    pause => $self->pause_file,
+    stop  => $self->stop_file,
+    traps => $self->trap_signals,
+  );
 }
 
 =back
@@ -205,12 +191,6 @@ will continue to run but will not execute the code block passed in.
 Clears both the "stopped" and "paused" flags.
 
 =cut
-
-sub clear_flags {
-  my $self = shift;
-  $self->start;
-  $self->resume;
-}
 
 =head2 is_running
 
@@ -253,27 +233,14 @@ secondary condition that decides whether to stop running.
 
 sub service {
   my ($self, $code) = @_;
-  return 0 if $self->is_stopped;
   return 0 if $self->running_pid;
-  die 'expected a CODE ref' unless is_CodeRef($code);
 
   if (my $guard = $self->run_lock) {
-    my $signalled = 0;
+    my $service = $self->machine->service($code);
 
-    $SIG{$_} = sub { $signalled = 1 }
-      foreach @{$self->trap_signals};
-
-    until ($signalled || $self->is_stopped) {
-      if ($self->is_paused) {
-        sleep 0.2;
-        next;
-      }
-
-      last unless $code->();
+    while ($service->()) {
+      ;
     }
-
-    undef $SIG{$_}
-      foreach @{$self->trap_signals};
 
     return 1;
   }

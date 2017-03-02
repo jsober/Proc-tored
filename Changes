@@ -1,4 +1,5 @@
 {{$NEXT}}
+- Use Auto::Mata to track service state
 
 0.12 2017-03-02
 - On service shutdown, truncate pid file before removing in case there are open

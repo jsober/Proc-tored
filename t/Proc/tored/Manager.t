@@ -1,5 +1,6 @@
 use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
 use Path::Tiny 'path';
+use Data::Dumper;
 
 my $dir = Path::Tiny->tempdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0);
 skip_all 'could not create writable temp directory' unless -w $dir;
@@ -27,7 +28,6 @@ sub counter($\$%) {
     return 1;
   };
 }
-
 
 ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
@@ -73,55 +73,53 @@ subtest 'run_lock' => sub {
   ok !$proc->is_running, 'is_running false after guard out of scope';
 };
 
-subtest 'service' => sub {
-  subtest 'start' => sub {
-    $proc->clear_flags;
-    my $acc = 0;
-    my $counter = counter $proc, $acc, 3 => sub { 0 };
-    ok $proc->service($counter), 'run service';
-    is $acc, 3, 'service callback was called expected number of times';
-    ok !$proc->is_stopped, '!is_stopped';
-    ok !$proc->is_paused, '!is_paused';
-  };
+subtest 'start' => sub {
+  $proc->clear_flags;
+  my $acc = 0;
+  my $counter = counter $proc, $acc, 3 => sub { 0 };
+  ok $proc->service($counter), 'run service';
+  is $acc, 3, 'service callback was called expected number of times';
+  ok !$proc->is_stopped, '!is_stopped';
+  ok !$proc->is_paused, '!is_paused';
+};
 
-  subtest 'stop' => sub {
-    $proc->clear_flags;
-    my $acc = 0;
-    my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
-    ok $proc->service($counter), 'run service';
-    is $acc, 3, 'service self-terminates after being signalled';
-  };
+subtest 'stop' => sub {
+  $proc->clear_flags;
+  my $acc = 0;
+  my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
+  ok $proc->service($counter), 'run service';
+  is $acc, 3, 'service self-terminates after being signalled';
+};
 
-  subtest 'cooperation' => sub {
-    $proc->clear_flags;
-    my $acc = 0;
-    my $recursive_start = 0;
+subtest 'cooperation' => sub {
+  $proc->clear_flags;
+  my $acc = 0;
+  my $recursive_start = 0;
 
-    my $counter = counter $proc, $acc,
-      1 => sub {
-        $proc->service(sub { $recursive_start = 1; return 0 });
-        return 0;
-      };
-
-    ok $proc->service($counter), 'run service';
-    is $acc, 1, 'stopped when expected';
-    ok !$recursive_start, 'second process did not start while first was running';
-  };
-
-  SKIP: {
-    skip 'signals not supported for MSWin32' if $^O eq 'MSWin32';
-    $proc->{trap_signals} = ['INT'];
-
-    subtest 'signals' => sub {
-      $proc->clear_flags;
-      my $acc = 0;
-      my $counter = counter $proc, $acc,
-        3  => sub { kill 'INT', $$ },
-        10 => sub { $proc->stop };
-
-      ok $proc->service($counter), 'run service';
-      is $acc, 3, 'stopped when expected';
+  my $counter = counter $proc, $acc,
+    1 => sub {
+      $proc->service(sub { $recursive_start = 1; return 0 });
+      return 0;
     };
+
+  ok $proc->service($counter), 'run service';
+  is $acc, 1, 'stopped when expected';
+  ok !$recursive_start, 'second process did not start while first was running';
+};
+
+SKIP: {
+  skip 'signals not supported for MSWin32' if $^O eq 'MSWin32';
+  $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir", trap_signals => ['INT']);
+  $proc->clear_flags;
+
+  subtest 'signals' => sub {
+    $proc->clear_flags;
+    my $acc = 0;
+    my $counter = counter $proc, $acc,
+      3  => sub { kill 'INT', $$ };
+
+    ok $proc->service($counter), 'run service';
+    is $acc, 3, 'stopped when expected';
   };
 };
 
