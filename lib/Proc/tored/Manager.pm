@@ -164,7 +164,9 @@ has machine => (
 
 sub _build_machine {
   my $self = shift;
+  #my $pidfile = path($self->dir)->child($self->name . '.pid');
   Proc::tored::Machine->new(
+    #pid   => "$pidfile",
     pause => $self->pause_file,
     stop  => $self->stop_file,
     traps => $self->trap_signals,

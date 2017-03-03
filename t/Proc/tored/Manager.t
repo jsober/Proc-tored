@@ -88,7 +88,7 @@ subtest 'stop' => sub {
   my $acc = 0;
   my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
   ok $proc->service($counter), 'run service';
-  is $acc, 3, 'service self-terminates after being signalled';
+  is $acc, 3, 'service self-terminates for touch file';
 };
 
 subtest 'cooperation' => sub {
