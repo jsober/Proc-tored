@@ -2,7 +2,6 @@ package Proc::tored::PidFile;
 
 use warnings;
 use strict;
-use Moo;
 use Carp;
 use Fcntl qw(:flock :seek :DEFAULT);
 use Guard qw(guard);
@@ -12,17 +11,10 @@ use Types::Standard qw(InstanceOf);
 use Try::Tiny;
 use Proc::tored::Types -types;
 
-has file_path => (
-  is  => 'ro',
-  isa => NonEmptyStr,
-);
-
-has file => (
-  is  => 'lazy',
-  isa => InstanceOf['Path::Tiny'],
-);
-
-sub _build_file { path(shift->file_path) }
+sub new {
+  my ($class, $file_path) = @_;
+  bless { file => path($file_path) }, $class;
+}
 
 sub is_running {
   my $self = shift;
@@ -55,8 +47,8 @@ sub wait {
 
 sub read_file {
   my $self = shift;
-  return 0 unless $self->file->is_file;
-  my ($line) = $self->file->lines({count => 1, chomp => 1}) or return 0;
+  return 0 unless $self->{file}->is_file;
+  my ($line) = $self->{file}->lines({count => 1, chomp => 1}) or return 0;
   my ($pid) = $line =~ /^(\d+)$/;
   return $pid || 0;
 }
@@ -65,7 +57,7 @@ sub write_file {
   my $self = shift;
   my $lock = $self->write_lock or return 0;
   return 0 if $self->running_pid;
-  $self->file->spew("$$\n");
+  $self->{file}->spew("$$\n");
   return 1;
 }
 
@@ -73,8 +65,8 @@ sub clear_file {
   my $self = shift;
   my $lock = $self->write_lock or return;
   return unless $self->is_running;
-  $self->file->append({truncate => 1});
-  try { $self->file->remove }
+  $self->{file}->append({truncate => 1});
+  try { $self->{file}->remove }
   catch { warn "error unlinking pid file: $_" }
 }
 
@@ -92,7 +84,7 @@ sub write_lock {
   my $self = shift;
 
   # Existing .lock file means another process came in ahead
-  my $lock = path($self->file_path . '.lock');
+  my $lock = path("$self->{file}.lock");
   return if $lock->exists;
 
   my $locked = try {

@@ -57,7 +57,7 @@ subtest 'pause/resume' => sub {
 
 subtest 'run lock' => sub {
   $proc->clear_flags;
-  my $path = $proc->pid_file->file;
+  my $path = $proc->pid_file->{file};
   my $lock = $proc->lock;
 
   ok $lock, 'lock';
