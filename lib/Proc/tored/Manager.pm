@@ -267,10 +267,20 @@ C<$timeout> is reached.
 =cut
 
 sub stop_wait {
-  my $self = shift;
+  my ($self, $timeout, $sleep) = @_;
+  $sleep ||= 0.2;
+
   $self->stop;
   return if $self->is_running;
-  $self->pid_file->wait(@_);
+
+  my $pid = $self->running_pid || return 0;
+
+  while (kill(0, $pid) && $timeout > 0) {
+    sleep $sleep;
+    $timeout -= $sleep;
+  }
+
+  !kill(0, $pid);
 }
 
 1;

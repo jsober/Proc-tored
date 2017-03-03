@@ -7,9 +7,7 @@ use Fcntl qw(:flock :seek :DEFAULT);
 use Guard qw(guard);
 use Path::Tiny qw(path);
 use Time::HiRes qw(sleep);
-use Types::Standard qw(InstanceOf);
 use Try::Tiny;
-use Proc::tored::Types -types;
 
 sub new {
   my ($class, $file_path) = @_;
