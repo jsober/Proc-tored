@@ -20,11 +20,11 @@ use constant TERM      => 'TERM';
 my $Flag = declare 'Flag', as InstanceOf['Proc::tored::Flag'];
 
 my $Proctor = declare 'Proctor', as Dict[
-  stopped  => $Flag,
-  paused   => $Flag,
-  traps    => SignalList,
+  stopped   => $Flag,
+  paused    => $Flag,
+  traps     => SignalList,
   signalled => Bool,
-  call     => CodeRef,
+  call      => CodeRef,
 ];
 
 my $Stopped   = declare 'Stopped',   as $Proctor, where { $_->{stopped}->is_set };
