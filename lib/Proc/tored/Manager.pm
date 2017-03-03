@@ -83,7 +83,12 @@ Unless manually specified, the pid file's path is L</dir>/L</name>.pid.
 has pid_file => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::PidFile'],
-  handles => [qw(running_pid is_running read_pid lock)],
+  handles => {
+    running_pid => 'running_pid',
+    is_running  => 'is_running',
+    lock        => 'lock',
+    read_pid    => 'read_file',
+  },
 );
 
 sub _build_pid_file {

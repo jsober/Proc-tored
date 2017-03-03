@@ -31,7 +31,7 @@ sub is_running {
 
 sub running_pid {
   my $self = shift;
-  my $pid = $self->read_pid;
+  my $pid = $self->read_file;
   return 0 unless $pid;
   return $pid if kill 0, $pid;
   return 0;
@@ -53,7 +53,7 @@ sub wait {
   !kill(0, $pid);
 }
 
-sub read_pid {
+sub read_file {
   my $self = shift;
   return 0 unless $self->file->is_file;
   my ($line) = $self->file->lines({count => 1, chomp => 1}) or return 0;
@@ -61,7 +61,7 @@ sub read_pid {
   return $pid || 0;
 }
 
-sub write_pid {
+sub write_file {
   my $self = shift;
   my $lock = $self->write_lock or return 0;
   return 0 if $self->running_pid;
@@ -69,7 +69,7 @@ sub write_pid {
   return 1;
 }
 
-sub clear_pid {
+sub clear_file {
   my $self = shift;
   my $lock = $self->write_lock or return;
   return unless $self->is_running;
@@ -80,7 +80,7 @@ sub clear_pid {
 
 sub lock {
   my $self = shift;
-  return guard { $self->clear_pid } if $self->write_pid;
+  return guard { $self->clear_file } if $self->write_file;
   return;
 }
 

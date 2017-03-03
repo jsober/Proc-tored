@@ -32,6 +32,47 @@ my $Paused    = declare 'Paused',    as $Proctor, where { $_->{paused}->is_set }
 my $Signalled = declare 'Signalled', as $Proctor, where { $_->{signalled} };
 my $Running   = declare 'Running',   as ~$Paused & ~$Stopped & ~$Signalled;
 
+my $FSM = machine {
+  ready    READY;
+  terminal TERM;
+
+  transition READY, to PAUSED,    on $Paused;
+  transition READY, to SIGNALLED, on $Signalled;
+  transition READY, to STOPPED,   on $Stopped;
+  transition READY, to RUNNING,   on $Running, with {
+    my $me = $_;
+    $SIG{$_} = sub { $me->{signalled} = 1 } foreach @{$me->{traps}};
+    $_;
+  };
+
+  transition PAUSED, to RUNNING,   on ~$Paused;
+  transition PAUSED, to SIGNALLED, on $Signalled;
+  transition PAUSED, to STOPPED,   on $Stopped;
+  transition PAUSED, to PAUSED,    on $Paused, with {
+    sleep 0.2;
+    $_;
+  };
+
+  transition RUNNING, to PAUSED,    on $Paused;
+  transition RUNNING, to SIGNALLED, on $Signalled;
+  transition RUNNING, to STOPPED,   on $Stopped;
+  transition RUNNING, to RUNNING,   on $Running, with {
+    unless ($_->{call}->()) {
+      $_->{signalled} = 1;
+    }
+
+    $_;
+  };
+
+  transition SIGNALLED, to STOPPED, on $Signalled;
+
+  transition STOPPED, to TERM, with {
+    my $me = $_;
+    undef $SIG{$_} foreach @{$me->{traps}};
+    $_;
+  };
+};
+
 sub new {
   my ($class, %param) = @_;
   my $stop  = $param{stop}  // croak 'expected parameter "stop"';
@@ -39,10 +80,9 @@ sub new {
   my $traps = $param{traps};
 
   my $self = bless {
-    stop    => Proc::tored::Flag->new(touch_file_path => $stop),
-    pause   => Proc::tored::Flag->new(touch_file_path => $pause),
-    traps   => $traps // [],
-    machine => builder(),
+    stop  => Proc::tored::Flag->new(touch_file_path => $stop),
+    pause => Proc::tored::Flag->new(touch_file_path => $pause),
+    traps => $traps // [],
   };
 
   bless $self, $class;
@@ -61,49 +101,6 @@ sub clear_flags {
   $self->resume;
 }
 
-sub builder {
-  machine {
-    ready    READY;
-    terminal TERM;
-
-    transition READY, to PAUSED,    on $Paused;
-    transition READY, to SIGNALLED, on $Signalled;
-    transition READY, to STOPPED,   on $Stopped;
-    transition READY, to RUNNING,   on $Running, with {
-      my $me = $_;
-      $SIG{$_} = sub { $me->{signalled} = 1 } foreach @{$me->{traps}};
-      $_;
-    };
-
-    transition PAUSED, to RUNNING,   on ~$Paused;
-    transition PAUSED, to SIGNALLED, on $Signalled;
-    transition PAUSED, to STOPPED,   on $Stopped;
-    transition PAUSED, to PAUSED,    on $Paused, with {
-      sleep 0.2;
-      $_;
-    };
-
-    transition RUNNING, to PAUSED,    on $Paused;
-    transition RUNNING, to SIGNALLED, on $Signalled;
-    transition RUNNING, to STOPPED,   on $Stopped;
-    transition RUNNING, to RUNNING,   on $Running, with {
-      unless ($_->{call}->()) {
-        $_->{signalled} = 1;
-      }
-
-      $_;
-    };
-
-    transition SIGNALLED, to STOPPED, on $Signalled;
-
-    transition STOPPED, to TERM, with {
-      my $me = $_;
-      undef $SIG{$_} foreach @{$me->{traps}};
-      $_;
-    };
-  };
-}
-
 sub service {
   my ($self, $code) = @_;
 
@@ -115,7 +112,7 @@ sub service {
     signalled => 0,
   };
 
-  my $fsm = $self->{machine}->();
+  my $fsm = $FSM->();
   sub { $fsm->($state) };
 };
 
