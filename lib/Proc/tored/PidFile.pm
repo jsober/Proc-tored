@@ -27,22 +27,6 @@ sub running_pid {
   return 0;
 }
 
-sub wait {
-  my ($self, $timeout, $sleep) = @_;
-  $sleep ||= 0.2;
-
-  return if $self->is_running;
-
-  my $pid = $self->running_pid || return 0;
-
-  while (kill(0, $pid) && $timeout > 0) {
-    sleep $sleep;
-    $timeout -= $sleep;
-  }
-
-  !kill(0, $pid);
-}
-
 sub read_file {
   my $self = shift;
   return 0 unless $self->{file}->is_file;
