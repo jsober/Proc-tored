@@ -80,16 +80,16 @@ my $FSM = machine {
 
 sub new {
   my ($class, %param) = @_;
-  my $stop  = $param{stop}  // croak 'expected parameter "stop"';
-  my $pause = $param{pause} // croak 'expected parameter "pause"';
-  my $traps = $param{traps};
+  my $stop  = $param{stop}  || croak 'expected parameter "stop"';
+  my $pause = $param{pause} || croak 'expected parameter "pause"';
+  my $traps = $param{traps} || [];
 
   my $self = bless {
     stop       => $stop,
     pause      => $pause,
     stop_flag  => Proc::tored::Flag->new(touch_file_path => $stop),
     pause_flag => Proc::tored::Flag->new(touch_file_path => $pause),
-    traps      => $traps // [],
+    traps      => $traps,
   };
 
   bless $self, $class;
