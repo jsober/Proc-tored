@@ -46,44 +46,43 @@ method.
 
 =over
 
-=cut
-
 =item name
 
 The name of the service. Services created with an identical L</name> and
 L</dir> will use the same pid file and share flags.
-
-=cut
-
-has name => (
-  is  => 'ro',
-  isa => NonEmptyStr,
-  required => 1,
-);
 
 =item dir
 
 A valid run directory (C</var/run> is a common choice). The path must be
 writable.
 
-=cut
-
-has dir => (
-  is  => 'ro',
-  isa => Dir,
-  required => 1,
-);
-
 =item pid_file
 
 Unless manually specified, the pid file's path is L</dir>/L</name>.pid.
 
+=item stop_file
+
+Unless manually specified, the stop file's path is L</dir>/L</name>.stopped.
+
+=item pause_file
+
+Unless manually specified, the pause file's path is L</dir>/L</name>.paused.
+
+=item trap_signals
+
+An optional array of signals (suitable for use in C<%SIG>) allowed to end the
+L</service> loop. Unless specified, no signal handlers are installed.
+
+=back
+
 =cut
 
-has pid_file => (
-  is  => 'lazy',
-  isa => Str,
-);
+has name         => (is => 'ro', isa => NonEmptyStr, required => 1);
+has dir          => (is => 'ro', isa => Dir, required => 1);
+has pid_file     => (is => 'lazy', isa => NonEmptyStr);
+has stop_file    => (is => 'lazy', isa => NonEmptyStr);
+has pause_file   => (is => 'lazy', isa => NonEmptyStr);
+has trap_signals => (is => 'ro', isa => SignalList, default => sub {[]});
 
 sub _build_pid_file {
   my $self = shift;
@@ -91,52 +90,17 @@ sub _build_pid_file {
   return "$file";
 }
 
-=item stop_file
-
-Unless manually specified, the stop file's path is L</dir>/L</name>.stopped.
-
-=cut
-
-has stop_file => (
-  is => 'lazy',
-  isa => NonEmptyStr,
-);
-
 sub _build_stop_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.stopped');
   return "$file";
 }
 
-=item pause_file
-
-Unless manually specified, the pause file's path is L</dir>/L</name>.paused.
-
-=cut
-
-has pause_file => (
-  is => 'lazy',
-  isa => NonEmptyStr,
-);
-
 sub _build_pause_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.paused');
   return "$file";
 }
-
-=item trap_signals
-
-An optional array of signals (suitable for use in C<%SIG>) allowed to end the
-L</service> loop. Unless specified, no signal handlers are installed.
-
-=cut
-
-has trap_signals => (
-  is  => 'ro',
-  isa => SignalList,
-  default => sub {[]},
-);
 
 has machine => (
   is  => 'lazy',
@@ -159,9 +123,18 @@ sub _build_machine {
   );
 }
 
-=back
-
 =head1 METHODS
+
+=head2 read_pid
+
+Returns the pid identified in the pid file. Returns 0 if the pid file does
+not exist or is empty.
+
+=head2 running_pid
+
+Returns the pid of an already-running process or 0 if the pid file does not
+exist, is empty, or the process identified by the pid does not exist or is not
+visible.
 
 =head2 stop
 
@@ -189,50 +162,6 @@ Clears both the "stopped" and "paused" flags.
 
 Returns true if the current process is the active, running process.
 
-=head2 service
-
-Accepts a code ref which will be called repeatedly until it returns false or
-the "stopped" flag is set. If the "paused" flag is set, will continue to rune
-but will not execute the code block until the "paused" flag has been cleared.
-
-Example using a pool of forked workers, an imaginary task queue, and a
-secondary condition that decides whether to stop running.
-
-  $proctor->service(sub {
-    # Wait for an available worker, but with a timeout
-    my $worker = $worker_pool->next_available(0.1);
-
-    if ($worker) {
-      # Pull next task from the queue with a 0.1s timeout
-      my $task = poll_queue_with_timeout(0.1);
-
-      if ($task) {
-        $worker->assign($task);
-      }
-    }
-
-    return unless touch_file_exists();
-    return 1;
-  });
-
-=cut
-
-sub service {
-  my ($self, $code) = @_;
-  $self->machine->run($code);
-}
-
-=head2 read_pid
-
-Returns the pid identified in the pid file. Returns 0 if the pid file does
-not exist or is empty.
-
-=head2 running_pid
-
-Returns the pid of an already-running process or 0 if the pid file does not
-exist, is empty, or the process identified by the pid does not exist or is not
-visible.
-
 =head2 stop_wait
 
 Sets the "stopped" flag and blocks until the L<running_pid> exits or the
@@ -258,5 +187,39 @@ sub stop_wait {
 
   !kill(0, $pid);
 }
+
+=head2 service
+
+Accepts a code ref which will be called repeatedly until it returns false or
+the "stopped" flag is set. If the "paused" flag is set, will continue to rune
+but will not execute the code block until the "paused" flag has been cleared.
+
+Example using a pool of forked workers, an imaginary task queue, and a
+secondary condition that decides whether to stop running.
+
+  $proctor->service(sub {
+    # Wait for an available worker, but with a timeout
+    my $worker = $worker_pool->next_available(0.1);
+
+    if ($worker) {
+      # Pull next task from the queue with a 0.1s timeout
+      my $task = poll_queue_with_timeout(0.1);
+
+      if ($task) {
+        $worker->assign($task);
+      }
+    }
+
+    return if service_should_stop();
+    return 1;
+  });
+
+=cut
+
+sub service {
+  my ($self, $code) = @_;
+  $self->machine->run($code);
+}
+
 
 1;

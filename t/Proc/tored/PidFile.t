@@ -42,7 +42,7 @@ subtest 'atomicity' => sub {
   scope_guard { $pidfile->clear_file };
 
   $pidfile->{write_lock}->touch;
-  scope_guard { $pidfile->{write_lock}->unlink };
+  scope_guard { $pidfile->{write_lock}->remove };
   is $pidfile->write_file, 0, 'write_file returns 0 if write_lock fails';
 };
 
