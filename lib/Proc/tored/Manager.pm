@@ -82,19 +82,13 @@ Unless manually specified, the pid file's path is L</dir>/L</name>.pid.
 
 has pid_file => (
   is  => 'lazy',
-  isa => InstanceOf['Proc::tored::PidFile'],
-  handles => {
-    running_pid => 'running_pid',
-    is_running  => 'is_running',
-    lock        => 'lock',
-    read_pid    => 'read_file',
-  },
+  isa => Str,
 );
 
 sub _build_pid_file {
   my $self = shift;
   my $file = path($self->dir)->child($self->name . '.pid');
-  Proc::tored::PidFile->new(file_path => "$file");
+  return "$file";
 }
 
 =item stop_file
@@ -159,14 +153,18 @@ sub _build_lock_file {
 has machine => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::Machine'],
-  handles => [qw(stop start is_stopped pause resume is_paused clear_flags)],
+  handles => [qw(
+    clear_flags
+    stop start is_stopped
+    pause resume is_paused
+    read_pid running_pid is_running
+  )],
 );
 
 sub _build_machine {
   my $self = shift;
-  my $pidfile = path($self->dir)->child($self->name . '.pid');
   Proc::tored::Machine->new(
-    pidfile => "$pidfile",
+    pidfile => $self->pid_file,
     pause   => $self->pause_file,
     stop    => $self->stop_file,
     traps   => $self->trap_signals,
@@ -233,19 +231,7 @@ secondary condition that decides whether to stop running.
 
 sub service {
   my ($self, $code) = @_;
-  return 0 if $self->running_pid;
-
-  if (my $lock = $self->pid_file->lock) {
-    my $service = $self->machine->service($code);
-
-    while ($service->()) {
-      ;
-    }
-
-    return 1;
-  }
-
-  return 0;
+  $self->machine->run($code);
 }
 
 =head2 read_pid

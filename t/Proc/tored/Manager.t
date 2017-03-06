@@ -58,24 +58,6 @@ subtest 'pause/resume' => sub {
   ok !$proc->is_paused, '!is_paused';
 };
 
-subtest 'run lock' => sub {
-  $proc->clear_flags;
-  my $path = $proc->pid_file->{file};
-  my $lock = $proc->lock;
-
-  ok $lock, 'lock';
-  ok $path->exists, 'pidfile created';
-  is $proc->running_pid, $$, 'running_pid returns current pid';
-  ok $proc->is_running, 'is_running true';
-  ok !$proc->lock, '!lock while is_running';
-
-  undef $lock;
-
-  ok !$path->is_file, 'pidfile removed after guard out of scope';
-  is $proc->running_pid, 0, 'running_pid returns 0 after guard out of scope';
-  ok !$proc->is_running, 'is_running false after guard out of scope';
-};
-
 subtest 'start' => sub {
   $proc->clear_flags;
   my $acc = 0;

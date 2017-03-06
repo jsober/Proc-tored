@@ -34,7 +34,6 @@ my $Proctor = declare 'Proctor', as Dict[
   init    => Bool,         # true when initialized and ready to run
   call    => CodeRef,      # code ref to call while running
   finish  => Bool,         # true when last callback returned false
-  msg     => Maybe[Str],   # message explaining why the service terminated
 ];
 
 my $Stopped    = declare 'Stopped',    as $Proctor, where { -e $_->{stopped} || $_->{stop} };
@@ -51,8 +50,8 @@ my $Finished   = declare 'Finished',   as $Proctor, where { $_->{finish} };
 my $Unfinished = declare 'Unfinished', as $Proctor, where { !$_->{finish} };
 
 my $FSM = machine {
-  ready    READY;
-  terminal TERM;
+  ready READY;
+  term  TERM;
 
   transition READY, to STATUS;
 
@@ -72,7 +71,6 @@ my $FSM = machine {
     foreach my $signal (@{$me->{traps}}) {
       $SIG{$signal} = sub {
         $me->{stop} = 1;
-        $me->{msg}  = "Received $signal";
       };
     }
 
@@ -80,10 +78,7 @@ my $FSM = machine {
     $_;
   };
 
-  transition LOCK, to TERM, on $LockFail, with {
-    my $pid = Proc::tored::PidFile->new($_->{pidfile})->read_file;
-    $_->{msg} = sprintf 'Another process is already running with pid %d', $pid;
-  };
+  transition LOCK, to TERM, on $LockFail;
 
   # Service loop: STATUS -> RUN -> STATUS|TERM
   # Calls the caller-supplied callback (I call that statement redundant) and
@@ -96,11 +91,7 @@ my $FSM = machine {
   };
 
   transition RUN, to STATUS, on $Unfinished;
-
-  transition RUN, to TERM, on $Finished, with {
-    $_->{msg} = 'Work complete';
-    $_;
-  };
+  transition RUN, to TERM, on $Finished;
 
   # Pause loop: STATUS -> PAUSE -> STATUS
   transition STATUS, to PAUSE, on $Paused;
@@ -128,23 +119,27 @@ sub new {
   my $traps   = $param{traps}   || [];
 
   my $self = bless {
-    stop       => $stop,
-    pause      => $pause,
-    pidfile    => $pidfile,
-    stop_flag  => Proc::tored::Flag->new(touch_file_path => $stop),
-    pause_flag => Proc::tored::Flag->new(touch_file_path => $pause),
-    traps      => $traps,
+    stop         => $stop,
+    pause        => $pause,
+    pidfile_path => $pidfile,
+    stop_flag    => Proc::tored::Flag->new(touch_file_path => $stop),
+    pause_flag   => Proc::tored::Flag->new(touch_file_path => $pause),
+    pidfile      => Proc::tored::PidFile->new($pidfile),
+    traps        => $traps,
   };
 
   bless $self, $class;
 }
 
-sub stop       { $_[0]->{stop_flag}->set }
-sub start      { $_[0]->{stop_flag}->unset }
-sub is_stopped { $_[0]->{stop_flag}->is_set }
-sub pause      { $_[0]->{pause_flag}->set }
-sub resume     { $_[0]->{pause_flag}->unset }
-sub is_paused  { $_[0]->{pause_flag}->is_set }
+sub stop        { $_[0]->{stop_flag}->set }
+sub start       { $_[0]->{stop_flag}->unset }
+sub is_stopped  { $_[0]->{stop_flag}->is_set }
+sub pause       { $_[0]->{pause_flag}->set }
+sub resume      { $_[0]->{pause_flag}->unset }
+sub is_paused   { $_[0]->{pause_flag}->is_set }
+sub read_pid    { $_[0]->{pidfile}->read_file }
+sub running_pid { $_[0]->{pidfile}->running_pid }
+sub is_running  { $_[0]->{pidfile}->is_running }
 
 sub clear_flags {
   my $self = shift;
@@ -152,11 +147,11 @@ sub clear_flags {
   $self->resume;
 }
 
-sub service {
+sub run {
   my ($self, $code) = @_;
 
-  my $state = {
-    pidfile => $self->{pidfile},
+  my $acc = {
+    pidfile => $self->{pidfile_path},
     stopped => $self->{stop},
     paused  => $self->{pause},
     lock    => 0,
@@ -166,11 +161,15 @@ sub service {
     init    => 0,
     call    => $code,
     finish  => 0,
-    msg     => undef,
   };
 
-  my $fsm = $FSM->();
-  sub { $fsm->($state) };
+  my $service = $FSM->();
+
+  while ($service->($acc)) {
+    ;
+  }
+
+  return $acc->{lock};
 };
 
 1;
