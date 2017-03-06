@@ -138,18 +138,6 @@ has trap_signals => (
   default => sub {[]},
 );
 
-has lock_file => (
-  is  => 'lazy',
-  isa => NonEmptyStr,
-  init_arg => undef,
-);
-
-sub _build_lock_file {
-  my $self = shift;
-  my $file = path($self->dir)->child($self->name . '.lock');
-  return "$file";
-}
-
 has machine => (
   is  => 'lazy',
   isa => InstanceOf['Proc::tored::Machine'],
