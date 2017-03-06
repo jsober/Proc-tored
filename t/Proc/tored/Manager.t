@@ -16,10 +16,13 @@ sub counter($\$%) {
   return sub {
     $$acc = ++$count;
 
-    if ($count >= $backstop) {
-      diag "backstop reached ($backstop)";
+    if ($count == $backstop) {
       $proc->stop;
       return;
+    }
+
+    if ($count == $backstop + 4) {
+      die "backstop failed ($count)";
     }
 
     return $flag{$count}->($count)
