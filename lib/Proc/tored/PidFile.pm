@@ -40,6 +40,8 @@ sub _build_file { path(shift->file_path) }
 has write_lock_file => (is => 'lazy', isa => InstanceOf['Path::Tiny']);
 sub _build_write_lock_file { path(shift->file_path . '.lock') }
 
+has mypid => (is => 'ro', isa => Int, default => sub { $$ }, init_arg => undef);
+
 =head1 METHODS
 
 =head2 is_running
@@ -141,6 +143,7 @@ sub lock {
 #-------------------------------------------------------------------------------
 sub write_lock {
   my $self = shift;
+  return unless $$ eq $self->mypid;
 
   # Existing .lock file means another process came in ahead
   my $lock = $self->write_lock_file;
