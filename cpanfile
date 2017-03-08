@@ -1,4 +1,4 @@
-requires 'Auto::Mata'      => 0.05;
+requires 'Auto::Mata'      => 0.07;
 requires 'Carp'            => 0;
 requires 'Exporter'        => 0;
 requires 'Fcntl'           => 0;

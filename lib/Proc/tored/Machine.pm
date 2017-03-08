@@ -165,9 +165,7 @@ sub run {
 
   my $service = $FSM->();
 
-  while ($service->($acc)) {
-    ;
-  }
+  $service->($acc);
 
   return $acc->{lock};
 };
