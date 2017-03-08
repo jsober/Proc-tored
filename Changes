@@ -35,28 +35,23 @@
 - Use a touch file to signal self-termination
 
 0.05 2017-02-17
-
 - Refactor locking to support more platforms
 - Work around for MSWin32/threaded signal handling in unit tests
 
 0.04 2017-02-16
-
 - Use Path::Tiny->tempdir for pidfile directory in tests
 - Fixed untrapped error when lockfile creation fails
 
 0.03 2017-02-15
-
 - Replace poll_wait_time attribute with parameter to
   Proc::tored::Role::Running->stop_running_process
 - Use secondary lock file to avoid inconsistent flocking on mswin32
 
 0.02 2017-02-14
-
 - New interface
 - Trap normal signals (TERM, INT, HUP, PIPE)
 - Rewrote cleanup code to handle unexpected errors more reliably
 - Fixed some inconsistent results in unit tests (hopefully)
 
 0.01 2017-02-13
-
 - First version
