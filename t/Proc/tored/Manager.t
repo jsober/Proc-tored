@@ -64,6 +64,7 @@ subtest 'start' => sub {
   my $counter = counter $proc, $acc, 3 => sub { 0 };
   ok $proc->service($counter), 'run service';
   is $acc, 3, 'service callback was called expected number of times';
+  ok !$proc->is_running, '!is_running';
   ok !$proc->is_stopped, '!is_stopped';
   ok !$proc->is_paused, '!is_paused';
 };
@@ -73,6 +74,7 @@ subtest 'stop' => sub {
   my $acc = 0;
   my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
   ok $proc->service($counter), 'run service';
+  ok !$proc->is_running, '!is_running';
   is $acc, 3, 'service self-terminates for touch file';
 };
 
@@ -88,6 +90,7 @@ subtest 'cooperation' => sub {
     };
 
   ok $proc->service($counter), 'run service';
+  ok !$proc->is_running, '!is_running';
   is $acc, 1, 'stopped when expected';
   ok !$recursive_start, 'second process did not start while first was running';
 };
@@ -104,6 +107,7 @@ SKIP: {
       3  => sub { kill 'INT', $$ };
 
     ok $proc->service($counter), 'run service';
+    ok !$proc->is_running, '!is_running';
     is $acc, 3, 'stopped when expected';
   };
 };
