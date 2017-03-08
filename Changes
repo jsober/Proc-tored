@@ -1,5 +1,7 @@
 {{$NEXT}}
 - Update to Auto::Mata 0.07
+- Proc::tored::Machine is now a Moo class
+- Proc::tored::PidFile is now a Moo class
 
 0.13 2017-03-06
 - Use Auto::Mata to track service state

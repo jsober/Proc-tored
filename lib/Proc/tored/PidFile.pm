@@ -23,29 +23,24 @@ Allows the use of a pid file to manage a running service.
 
 use warnings;
 use strict;
+use Moo;
 use Carp;
 use Fcntl qw(:flock :seek :DEFAULT);
 use Guard qw(guard);
 use Path::Tiny qw(path);
 use Time::HiRes qw(sleep);
 use Try::Tiny;
+use Types::Standard -types;
+
+has file_path => (is => 'ro', isa => Str);
+
+has file => (is => 'lazy', isa => InstanceOf['Path::Tiny']);
+sub _build_file { path(shift->file_path) }
+
+has write_lock_file => (is => 'lazy', isa => InstanceOf['Path::Tiny']);
+sub _build_write_lock_file { path(shift->file_path . '.lock') }
 
 =head1 METHODS
-
-=head2 new
-
-Creates a new pid file. Accepts a string indicating the path to be used as a
-pid file.
-
-=cut
-
-sub new {
-  my ($class, $file_path) = @_;
-  bless {
-    file => path($file_path),
-    write_lock => path("$file_path.lock"),
-  }, $class;
-}
 
 =head2 is_running
 
@@ -83,8 +78,8 @@ is empty.
 
 sub read_file {
   my $self = shift;
-  return 0 unless $self->{file}->is_file;
-  my ($line) = $self->{file}->lines({count => 1, chomp => 1}) or return 0;
+  return 0 unless $self->file->is_file;
+  my ($line) = $self->file->lines({count => 1, chomp => 1}) or return 0;
   my ($pid) = $line =~ /^(\d+)$/;
   return $pid || 0;
 }
@@ -101,7 +96,7 @@ sub write_file {
   my $self = shift;
   my $lock = $self->write_lock or return 0;
   return 0 if $self->running_pid;
-  $self->{file}->spew("$$\n");
+  $self->file->spew("$$\n");
   return 1;
 }
 
@@ -115,8 +110,8 @@ sub clear_file {
   my $self = shift;
   my $lock = $self->write_lock or return;
   return unless $self->is_running;
-  $self->{file}->append({truncate => 1});
-  try { $self->{file}->remove }
+  $self->file->append({truncate => 1});
+  try { $self->file->remove }
   catch { warn "error unlinking pid file: $_" }
 }
 
@@ -148,7 +143,7 @@ sub write_lock {
   my $self = shift;
 
   # Existing .lock file means another process came in ahead
-  my $lock = $self->{write_lock};
+  my $lock = $self->write_lock_file;
   return if $lock->exists;
 
   my $locked = try {

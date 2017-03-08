@@ -116,10 +116,10 @@ has machine => (
 sub _build_machine {
   my $self = shift;
   Proc::tored::Machine->new(
-    pidfile => $self->pid_file,
-    pause   => $self->pause_file,
-    stop    => $self->stop_file,
-    traps   => $self->trap_signals,
+    pidfile_path => $self->pid_file,
+    stop_path    => $self->stop_file,
+    pause_path   => $self->pause_file,
+    traps        => $self->trap_signals,
   );
 }
 

@@ -8,7 +8,7 @@ skip_all 'could not create writable temp directory' unless -w $dir;
 
 my $path = $dir->child("pidfile-$$");
 
-ok my $pidfile = Proc::tored::PidFile->new($path), 'new';
+ok my $pidfile = Proc::tored::PidFile->new(file_path => "$path"), 'new';
 
 subtest 'initial values' => sub {
   scope_guard { $pidfile->clear_file };
@@ -32,7 +32,7 @@ subtest 'positive path' => sub {
   is $pidfile->running_pid, 0, 'running_pid: lock cleared';
   ok !$pidfile->is_running, 'is_running: lock cleared';
 
-  $pidfile->{file}->spew("1234\n");
+  $pidfile->file->spew("1234\n");
   is $pidfile->read_file, 1234, 'read_file: non-existent pid';
   is $pidfile->running_pid, 0, 'running_pid: non-existent pid';
   ok !$pidfile->is_running, 'is_running: non-existent pid';
@@ -41,8 +41,8 @@ subtest 'positive path' => sub {
 subtest 'atomicity' => sub {
   scope_guard { $pidfile->clear_file };
 
-  $pidfile->{write_lock}->touch;
-  scope_guard { $pidfile->{write_lock}->remove };
+  $pidfile->write_lock_file->touch;
+  scope_guard { $pidfile->write_lock_file->remove };
   is $pidfile->write_file, 0, 'write_file returns 0 if write_lock fails';
 };
 

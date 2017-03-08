@@ -2,8 +2,9 @@ package Proc::tored::Machine;
 
 use strict;
 use warnings;
-use Auto::Mata;
+use Moo;
 use Carp;
+use Auto::Mata '!with';
 use Proc::tored::Flag;
 use Proc::tored::PidFile;
 use Proc::tored::Types qw(SignalList);
@@ -19,12 +20,14 @@ use constant LOCK   => 'LOCK';
 use constant RUN    => 'RUN';
 use constant TERM   => 'TERM';
 
-my $Lock = InstanceOf['Guard'];
+my $Lock    = InstanceOf['Guard'];
+my $Flag    = InstanceOf['Proc::tored::Flag'];
+my $PidFile = InstanceOf['Proc::tored::PidFile'];
 
 my $Proctor = declare 'Proctor', as Dict[
-  pidfile => Str,          # pid file path
-  stopped => Str,          # stop file path
-  paused  => Str,          # pause file path
+  pidfile => $PidFile, # PidFile
+  stopped => $Flag,    # Stop Flag
+  paused  => $Flag,    # Pause Flag
 
   lock    => Bool,
   locked  => Maybe[$Lock],
@@ -36,9 +39,9 @@ my $Proctor = declare 'Proctor', as Dict[
   finish  => Bool,         # true when last callback returned false
 ];
 
-my $Stopped    = declare 'Stopped',    as $Proctor, where { -e $_->{stopped} || $_->{stop} };
+my $Stopped    = declare 'Stopped',    as $Proctor, where { $_->{stopped}->is_set || $_->{stop} };
 my $NotStopped = declare 'NotStopped', as $Proctor & ~$Stopped;
-my $Paused     = declare 'Paused',     as $Proctor, where { -e $_->{paused} };
+my $Paused     = declare 'Paused',     as $Proctor, where { $_->{paused}->is_set };
 my $NotPaused  = declare 'NotPaused',  as $Proctor & ~$Paused;
 my $MayRun     = declare 'MayRun',     as $NotStopped & $NotPaused;
 my $Unlocked   = declare 'Unlocked',   as $MayRun,  where { !$_->{lock} };
@@ -59,13 +62,13 @@ my $FSM = machine {
   # Attempts to acquire run lock using the pid file. If successful, sets up any
   # signal trapping requested and returns to STATUS. Otherwise, sets the
   # failure message and proceeds to TERM.
-  transition STATUS, to LOCK, on $Unlocked, with {
+  transition STATUS, to LOCK, on $Unlocked, using {
     $_->{lock}   = 1;
-    $_->{locked} = Proc::tored::PidFile->new($_->{pidfile})->lock;
+    $_->{locked} = $_->{pidfile}->lock;
     $_;
   };
 
-  transition LOCK, to STATUS, on $Locked, with {
+  transition LOCK, to STATUS, on $Locked, using {
     my $me = $_;
 
     foreach my $signal (@{$me->{traps}}) {
@@ -85,7 +88,7 @@ my $FSM = machine {
   # sets the 'finish' flag to true if the callback returns false. If 'finish'
   # is true, sets the completion message and proceeds to TERM. Otherwise,
   # returns to STATUS.
-  transition STATUS, to RUN, on $Running, with {
+  transition STATUS, to RUN, on $Running, using {
     $_->{finish} = $_->{call}->() ? 0 : 1;
     $_;
   };
@@ -96,7 +99,7 @@ my $FSM = machine {
   # Pause loop: STATUS -> PAUSE -> STATUS
   transition STATUS, to PAUSE, on $Paused;
 
-  transition PAUSE, to STATUS, on $Paused, with {
+  transition PAUSE, to STATUS, on $Paused, using {
     sleep 0.2;
     $_;
   };
@@ -104,42 +107,51 @@ my $FSM = machine {
   # Stop loop: STATUS -> STOP -> STATUS|TERM
   transition STATUS, to STOP, on $Stopped;
 
-  transition STOP, to TERM, with {
+  transition STOP, to TERM, using {
     undef $SIG{$_} foreach @{$_->{traps}};
     $_->{init} = 0;
     $_;
   };
 };
 
-sub new {
-  my ($class, %param) = @_;
-  my $pidfile = $param{pidfile} || croak 'expected parameter "pidfile"';
-  my $stop    = $param{stop}    || croak 'expected parameter "stop"';
-  my $pause   = $param{pause}   || croak 'expected parameter "pause"';
-  my $traps   = $param{traps}   || [];
+has pidfile_path => (is => 'ro', isa => Str);
+has stop_path    => (is => 'ro', isa => Str);
+has pause_path   => (is => 'ro', isa => Str);
+has traps => (is => 'ro', isa => SignalList);
 
-  my $self = bless {
-    stop         => $stop,
-    pause        => $pause,
-    pidfile_path => $pidfile,
-    stop_flag    => Proc::tored::Flag->new(touch_file_path => $stop),
-    pause_flag   => Proc::tored::Flag->new(touch_file_path => $pause),
-    pidfile      => Proc::tored::PidFile->new($pidfile),
-    traps        => $traps,
-  };
+has pidfile => (
+  is  => 'lazy',
+  isa => $PidFile,
+  handles => {
+    read_pid    => 'read_file',
+    running_pid => 'running_pid',
+    is_running  => 'is_running',
+  },
+);
 
-  bless $self, $class;
-}
+has stop_flag => (
+  is  => 'lazy',
+  isa => $Flag,
+  handles => {
+    stop       => 'set',
+    start      => 'unset',
+    is_stopped => 'is_set',
+  },
+);
 
-sub stop        { $_[0]->{stop_flag}->set }
-sub start       { $_[0]->{stop_flag}->unset }
-sub is_stopped  { $_[0]->{stop_flag}->is_set }
-sub pause       { $_[0]->{pause_flag}->set }
-sub resume      { $_[0]->{pause_flag}->unset }
-sub is_paused   { $_[0]->{pause_flag}->is_set }
-sub read_pid    { $_[0]->{pidfile}->read_file }
-sub running_pid { $_[0]->{pidfile}->running_pid }
-sub is_running  { $_[0]->{pidfile}->is_running }
+has pause_flag => (
+  is  => 'lazy',
+  isa => $Flag,
+  handles => {
+    pause     => 'set',
+    resume    => 'unset',
+    is_paused => 'is_set',
+  },
+);
+
+sub _build_pidfile { Proc::tored::PidFile->new(file_path => shift->pidfile_path) }
+sub _build_stop_flag { Proc::tored::Flag->new(touch_file_path => shift->stop_path) }
+sub _build_pause_flag { Proc::tored::Flag->new(touch_file_path => shift->pause_path) }
 
 sub clear_flags {
   my $self = shift;
@@ -151,12 +163,12 @@ sub run {
   my ($self, $code) = @_;
 
   my $acc = {
-    pidfile => $self->{pidfile_path},
-    stopped => $self->{stop},
-    paused  => $self->{pause},
+    pidfile => $self->pidfile,
+    stopped => $self->stop_flag,
+    paused  => $self->pause_flag,
     lock    => 0,
     locked  => undef,
-    traps   => $self->{traps},
+    traps   => $self->traps,
     stop    => 0,
     init    => 0,
     call    => $code,
