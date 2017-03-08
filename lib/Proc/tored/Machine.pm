@@ -61,7 +61,7 @@ my $FSM = machine {
   transition LOCK,   to STATUS, on $Locked,   using { my $me = $_; $SIG{$_} = sub { $me->{quit} = 1 } foreach @{$me->{traps}}; $_->{started} = 1; $_ };
   transition LOCK,   to TERM,   on $Unlocked;
   # Term
-  transition STOP,   to TERM,   on $Proctor,  using { undef $SIG{$_} foreach @{$_->{traps}}; $_ };
+  transition STOP,   to TERM,   on $Proctor,  using { undef $_->{lock}; undef $SIG{$_} foreach @{$_->{traps}}; $_ };
 };
 
 has pidfile_path => (is => 'ro', isa => NonEmptyStr, required => 1);
