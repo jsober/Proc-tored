@@ -128,7 +128,7 @@ sub run {
 
   $service->($acc);
 
-  return $acc->{lock};
+  return $acc->{started};
 };
 
 1;
