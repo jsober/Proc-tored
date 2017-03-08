@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.14 2017-03-08
 - Update to Auto::Mata 0.07
 - Proc::tored::Machine is now a Moo class
 - Proc::tored::PidFile is now a Moo class
