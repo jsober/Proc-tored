@@ -1,5 +1,6 @@
 {{$NEXT}}
 - Fixed bug allowing a guard object to be held inappropriately
+- Fixed bug causing pid files to be overwritten/unlinked by forked child processes
 
 0.14 2017-03-08
 - Update to Auto::Mata 0.07
