@@ -114,10 +114,10 @@ my $FSM = machine {
   };
 };
 
-has pidfile_path => (is => 'ro', isa => Str);
-has stop_path    => (is => 'ro', isa => Str);
-has pause_path   => (is => 'ro', isa => Str);
-has traps => (is => 'ro', isa => SignalList);
+has pidfile_path => (is => 'ro', isa => Str, required => 1);
+has stop_path    => (is => 'ro', isa => Str, required => 1);
+has pause_path   => (is => 'ro', isa => Str, required => 1);
+has traps        => (is => 'ro', isa => SignalList, default => sub {[]});
 
 has pidfile => (
   is  => 'lazy',
