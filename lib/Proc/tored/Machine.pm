@@ -55,7 +55,7 @@ sub sigtrap {
   my $acc = shift;
   foreach my $signal (@{$acc->{traps}}) {
     $SIG{$signal} = sub {
-      warn "Caught SIG$signal";
+      warn "Caught SIG$signal\n";
       $acc->{quit} = 1;
       $acc;
     };
