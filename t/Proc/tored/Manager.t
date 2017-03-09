@@ -1,6 +1,8 @@
-use Test2::Bundle::Extended -target => 'Proc::tored::Manager';
+use Test2::Bundle::Extended;
 use Path::Tiny 'path';
 use Data::Dumper;
+use Proc::tored::Manager;
+use Proc::tored::Machine;
 
 my $dir = Path::Tiny->tempdir('temp.XXXXXX', CLEANUP => 1, EXLOCK => 0);
 skip_all 'could not create writable temp directory' unless -w $dir;
@@ -32,13 +34,14 @@ sub counter($\$%) {
   };
 }
 
-ok my $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
+ok my $proc = Proc::tored::Manager->new(name => 'proc-tored-test-' . $$, dir => "$dir"), 'new';
 is $proc->running_pid, 0, 'running_pid is 0 with no running process';
 ok !$proc->is_running, '!is_running';
 ok !$proc->is_stopped, '!is_stopped';
 ok !$proc->is_paused, '!is_paused';
 
 subtest 'start/stop' => sub {
+  diag 'Verify that stop flag';
   $proc->clear_flags;
   ok !$proc->is_stopped, '!is_stopped';
   ok !$proc->start, '!start';
@@ -49,6 +52,7 @@ subtest 'start/stop' => sub {
 };
 
 subtest 'pause/resume' => sub {
+  diag 'Verify the pause flag';
   $proc->clear_flags;
   ok !$proc->is_paused, '!is_paused';
   ok !$proc->resume, '!resume';
@@ -58,7 +62,8 @@ subtest 'pause/resume' => sub {
   ok !$proc->is_paused, '!is_paused';
 };
 
-subtest 'start' => sub {
+subtest 'service' => sub {
+  diag 'Verify function of service()';
   $proc->clear_flags;
   my $acc = 0;
   my $counter = counter $proc, $acc, 3 => sub { 0 };
@@ -70,6 +75,7 @@ subtest 'start' => sub {
 };
 
 subtest 'stop' => sub {
+  diag 'Verify function of stop()';
   $proc->clear_flags;
   my $acc = 0;
   my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
@@ -79,6 +85,7 @@ subtest 'stop' => sub {
 };
 
 subtest 'cooperation' => sub {
+  diag 'Verify that a process will not start while another is running';
   $proc->clear_flags;
   my $acc = 0;
   my $recursive_start = 0;
@@ -95,12 +102,38 @@ subtest 'cooperation' => sub {
   ok !$recursive_start, 'second process did not start while first was running';
 };
 
+subtest 'precedence' => sub {
+  diag 'Verify precedence of stop over the pause flag (will die rather than pause)';
+  $proc->clear_flags;
+
+  # Override the pause_sleep function to prevent actually pausing the service
+  # and hanging up the test.
+  no warnings 'redefine';
+  local *Proc::tored::Machine::pause_sleep = sub { die 'service was paused' };
+
+  my $acc = 0;
+  my $counter = counter $proc, $acc,
+    1 => sub {
+      $proc->pause;
+      $proc->stop;
+      return 1;
+    },
+    2 => sub {
+      return 0;
+    };
+
+  ok $proc->service($counter), 'run service';
+  ok !$proc->is_running, '!is_running';
+  is $acc, 1, 'stopped when expected';
+};
+
 SKIP: {
   skip 'signals not supported for MSWin32' if $^O eq 'MSWin32';
-  $proc = $CLASS->new(name => 'proc-tored-test-' . $$, dir => "$dir", trap_signals => ['INT']);
+  $proc = Proc::tored::Manager->new(name => 'proc-tored-test-' . $$, dir => "$dir", trap_signals => ['INT']);
   $proc->clear_flags;
 
   subtest 'signals' => sub {
+    diag 'Verify posix signal trapping on supported architectures';
     $proc->clear_flags;
     my $acc = 0;
     my $counter = counter $proc, $acc,

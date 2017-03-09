@@ -8,7 +8,7 @@ use Auto::Mata '!with';
 use Proc::tored::Flag;
 use Proc::tored::PidFile;
 use Proc::tored::Types -types;
-use Time::HiRes qw(sleep);
+use Time::HiRes;
 use Type::Utils qw(declare as where);
 use Types::Standard -types;
 
@@ -34,16 +34,18 @@ my $Proctor = declare 'Proctor', as Dict[
   finish  => Bool,       # true when last callback returned false
 ];
 
-my $Stopped    = declare 'Stopped',    as $Proctor, where { $_->{stopped}->is_set || $_->{quit} };
-my $Paused     = declare 'Paused',     as $Proctor, where { $_->{paused}->is_set };
+my $Stopped    = declare 'Stopped',    as $Proctor,  where { $_->{stopped}->is_set || $_->{quit} };
+my $Paused     = declare 'Paused',     as ~$Stopped, where { $_->{paused}->is_set };
 my $NotStopped = declare 'NotStopped', as ~$Stopped;
 my $NotPaused  = declare 'NotPaused',  as ~$Paused;
 my $MayRun     = declare 'MayRun',     as $NotStopped & $NotPaused;
-my $Unlocked   = declare 'Unlocked',   as $MayRun,  where { !$_->{lock} };
-my $Locked     = declare 'Locked',     as $MayRun,  where { $_->{lock} };
-my $Started    = declare 'Started',    as $Locked,  where { $_->{started} };
-my $Running    = declare 'Running',    as $Started, where { !$_->{finish} };
-my $Finished   = declare 'Finished',   as $Started, where { $_->{finish} };
+my $Unlocked   = declare 'Unlocked',   as $MayRun,   where { !$_->{lock} };
+my $Locked     = declare 'Locked',     as $MayRun,   where { $_->{lock} };
+my $Started    = declare 'Started',    as $Locked,   where { $_->{started} };
+my $Running    = declare 'Running',    as $Started,  where { !$_->{finish} };
+my $Finished   = declare 'Finished',   as $Started,  where { $_->{finish} };
+
+sub pause_sleep { Time::HiRes::sleep(0.2) }
 
 my $FSM = machine {
   ready READY;
@@ -52,7 +54,7 @@ my $FSM = machine {
   # Ready
   transition READY,  to STATUS, on $Proctor;
   # Status loop
-  transition STATUS, to STATUS, on $Paused,   using { sleep 0.2; $_ };
+  transition STATUS, to STATUS, on $Paused,   using { pause_sleep(); $_ };
   transition STATUS, to STATUS, on $Running,  using { $_->{finish} = $_->{call}->() ? 0 : 1; $_ };
   transition STATUS, to STOP,   on $Finished;
   transition STATUS, to STOP,   on $Stopped;
