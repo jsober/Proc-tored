@@ -41,7 +41,7 @@ ok !$proc->is_stopped, '!is_stopped';
 ok !$proc->is_paused, '!is_paused';
 
 subtest 'start/stop' => sub {
-  diag 'Verify that stop flag';
+  # Verify that stop flag
   $proc->clear_flags;
   ok !$proc->is_stopped, '!is_stopped';
   ok !$proc->start, '!start';
@@ -52,7 +52,7 @@ subtest 'start/stop' => sub {
 };
 
 subtest 'pause/resume' => sub {
-  diag 'Verify the pause flag';
+  # Verify the pause flag
   $proc->clear_flags;
   ok !$proc->is_paused, '!is_paused';
   ok !$proc->resume, '!resume';
@@ -63,7 +63,7 @@ subtest 'pause/resume' => sub {
 };
 
 subtest 'service' => sub {
-  diag 'Verify function of service()';
+  # Verify function of service()
   $proc->clear_flags;
   my $acc = 0;
   my $counter = counter $proc, $acc, 3 => sub { 0 };
@@ -75,7 +75,7 @@ subtest 'service' => sub {
 };
 
 subtest 'stop' => sub {
-  diag 'Verify function of stop()';
+  # Verify function of stop()
   $proc->clear_flags;
   my $acc = 0;
   my $counter = counter $proc, $acc, 3 => sub { $proc->stop };
@@ -85,7 +85,7 @@ subtest 'stop' => sub {
 };
 
 subtest 'cooperation' => sub {
-  diag 'Verify that a process will not start while another is running';
+  # Verify that a process will not start while another is running
   $proc->clear_flags;
   my $acc = 0;
   my $recursive_start = 0;
@@ -103,7 +103,7 @@ subtest 'cooperation' => sub {
 };
 
 subtest 'precedence' => sub {
-  diag 'Verify precedence of stop over the pause flag (will die rather than pause)';
+  # Verify precedence of stop over the pause flag (will die rather than pause)
   $proc->clear_flags;
 
   # Override the pause_sleep function to prevent actually pausing the service
@@ -133,13 +133,12 @@ SKIP: {
   $proc->clear_flags;
 
   subtest 'signals' => sub {
-    diag 'Verify posix signal trapping on supported architectures';
+    # Verify posix signal trapping on supported architectures
     $proc->clear_flags;
     my $acc = 0;
-    my $counter = counter $proc, $acc,
-      3  => sub { kill 'INT', $$ };
+    my $counter = counter $proc, $acc, 3  => sub { kill 'INT', $$ };
 
-    ok $proc->service($counter), 'run service';
+    like warning { $proc->service($counter) }, qr/Caught SIGINT/, 'service warned on signal';
     ok !$proc->is_running, '!is_running';
     is $acc, 3, 'stopped when expected';
   };

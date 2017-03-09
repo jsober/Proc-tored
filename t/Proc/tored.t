@@ -54,12 +54,14 @@ SKIP: {
     my $count = 0;
     my $stop  = 4;
 
-    run {
-      if (++$count == $stop) {
-        kill 'INT', $$;
-      }
-      $count < 10
-    } $proctor;
+    like warning {
+      run {
+        if (++$count == $stop) {
+          kill 'INT', $$;
+        }
+        $count < 10
+      } $proctor;
+    }, qr/Caught SIGINT/, 'expected warning on sigtrap';
 
     is $count, $stop, 'expected work completed';
     is running $proctor, 0, 'no running pid';

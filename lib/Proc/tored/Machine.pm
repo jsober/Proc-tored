@@ -45,7 +45,22 @@ my $Started    = declare 'Started',    as $Locked,   where { $_->{started} };
 my $Running    = declare 'Running',    as $Started,  where { !$_->{finish} };
 my $Finished   = declare 'Finished',   as $Started,  where { $_->{finish} };
 
-sub pause_sleep { Time::HiRes::sleep(0.2) }
+sub pause_sleep {
+  my ($acc, $time) = @_;
+  Time::HiRes::sleep($time);
+  $acc;
+}
+
+sub sigtrap {
+  my $acc = shift;
+  foreach my $signal (@{$acc->{traps}}) {
+    $SIG{$signal} = sub {
+      warn "Caught SIG$signal";
+      $acc->{quit} = 1;
+      $acc;
+    };
+  }
+}
 
 my $FSM = machine {
   ready READY;
@@ -54,13 +69,13 @@ my $FSM = machine {
   # Ready
   transition READY,  to STATUS, on $Proctor;
   # Status loop
-  transition STATUS, to STATUS, on $Paused,   using { pause_sleep(); $_ };
+  transition STATUS, to STATUS, on $Paused,   using { pause_sleep($_, 0.2) };
   transition STATUS, to STATUS, on $Running,  using { $_->{finish} = $_->{call}->() ? 0 : 1; $_ };
   transition STATUS, to STOP,   on $Finished;
   transition STATUS, to STOP,   on $Stopped;
   # PidFile lock
   transition STATUS, to LOCK,   on $Unlocked, using { $_->{lock} = $_->{pidfile}->lock; $_ };
-  transition LOCK,   to STATUS, on $Locked,   using { my $me = $_; $SIG{$_} = sub { $me->{quit} = 1 } foreach @{$me->{traps}}; $_->{started} = 1; $_ };
+  transition LOCK,   to STATUS, on $Locked,   using { sigtrap($_); $_->{started} = 1; $_ };
   transition LOCK,   to TERM,   on $Unlocked;
   # Term
   transition STOP,   to TERM,   on $Proctor,  using { undef $_->{lock}; undef $SIG{$_} foreach @{$_->{traps}}; $_ };

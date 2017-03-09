@@ -1,4 +1,6 @@
 {{$NEXT}}
+- Fixed bug allowing pause flag to have precedence over stop flag
+- Emit a warning when a posix signal is received
 
 0.15 2017-03-08
 - Fixed bug allowing a guard object to be held inappropriately
