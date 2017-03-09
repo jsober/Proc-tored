@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.16 2017-03-09
 - Fixed bug allowing pause flag to have precedence over stop flag
 - Emit a warning when a posix signal is received
 
