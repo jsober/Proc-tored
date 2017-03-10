@@ -5,7 +5,7 @@ package Proc::tored::PidFile;
 
   use Proc::tored::PidFile;
 
-  my $pidfile = Proc::tored::PidFile->new($pid_file_path);
+  my $pidfile = Proc::tored::PidFile->new(file_path => $pid_file_path);
 
   if (my $lock = $pidfile->lock) {
     run_service;
