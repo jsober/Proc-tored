@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.17 2017-03-18
 - Add newline to warning emitted when a signal is caught
 - Regularly touch the pid file while running
 
