@@ -1,5 +1,6 @@
 {{$NEXT}}
 - Add newline to warning emitted when a signal is caught
+- Regularly touch the pid file while running
 
 0.16 2017-03-09
 - Fixed bug allowing pause flag to have precedence over stop flag

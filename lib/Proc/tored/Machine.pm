@@ -15,6 +15,7 @@ use Types::Standard -types;
 use constant READY  => 'READY';
 use constant STATUS => 'STATUS';
 use constant LOCK   => 'LOCK';
+use constant TOUCH  => 'TOUCH';
 use constant STOP   => 'STOP';
 use constant TERM   => 'TERM';
 
@@ -68,15 +69,21 @@ my $FSM = machine {
 
   # Ready
   transition READY,  to STATUS, on $Proctor;
-  # Status loop
-  transition STATUS, to STATUS, on $Paused,   using { pause_sleep($_, 0.2) };
-  transition STATUS, to STATUS, on $Running,  using { $_->{finish} = $_->{call}->() ? 0 : 1; $_ };
+
+  # Service loop
   transition STATUS, to STOP,   on $Finished;
   transition STATUS, to STOP,   on $Stopped;
+  transition STATUS, to TOUCH,  on $Paused,   using { pause_sleep($_, 0.2) };
+  transition STATUS, to TOUCH,  on $Running,  using { $_->{finish} = $_->{call}->() ? 0 : 1; $_ };
+
+  # Touch pid file
+  transition TOUCH,  to STATUS, using { $_->{pidfile}->touch; $_ };
+
   # PidFile lock
   transition STATUS, to LOCK,   on $Unlocked, using { $_->{lock} = $_->{pidfile}->lock; $_ };
   transition LOCK,   to STATUS, on $Locked,   using { sigtrap($_); $_->{started} = 1; $_ };
   transition LOCK,   to TERM,   on $Unlocked;
+
   # Term
   transition STOP,   to TERM,   on $Proctor,  using { undef $_->{lock}; undef $SIG{$_} foreach @{$_->{traps}}; $_ };
 };

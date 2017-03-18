@@ -34,7 +34,7 @@ use Types::Standard -types;
 
 has file_path => (is => 'ro', isa => Str);
 
-has file => (is => 'lazy', isa => InstanceOf['Path::Tiny']);
+has file => (is => 'lazy', isa => InstanceOf['Path::Tiny'], handles => ['touch']);
 sub _build_file { path(shift->file_path) }
 
 has write_lock_file => (is => 'lazy', isa => InstanceOf['Path::Tiny']);
