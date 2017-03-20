@@ -1,4 +1,5 @@
 {{$NEXT}}
+- Lock file logic moved to Proc::tored::LockFile
 
 0.17 2017-03-18
 - Add newline to warning emitted when a signal is caught
