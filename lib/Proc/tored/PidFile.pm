@@ -111,6 +111,7 @@ sub clear_file {
   my $self = shift;
   my $lock = $self->write_lock or return;
   return unless $self->is_running;
+  return unless $self->file->exists;
   $self->file->append({truncate => 1});
   try { $self->file->remove }
   catch { warn "error unlinking pid file: $_" }
