@@ -26,7 +26,6 @@ use warnings;
 use Moo;
 use Carp;
 use Fcntl qw(:flock :seek :DEFAULT);
-use Guard qw(guard);
 use Path::Tiny qw(path);
 use Time::HiRes qw(sleep);
 use Try::Tiny;

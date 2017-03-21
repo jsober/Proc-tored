@@ -77,7 +77,7 @@ sub lock {
   return unless $locked;
 
   return guard {
-    try { $self->file->remove }
+    try { $self->exists && $self->file->remove }
     catch { carp "unable to remove lock file: $_" }
   };
 }
