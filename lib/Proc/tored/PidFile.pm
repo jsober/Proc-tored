@@ -144,6 +144,7 @@ sub lock {
 sub write_lock {
   my $self = shift;
   return unless $$ eq $self->mypid;
+  return unless $self->lockfile;
   return $self->lockfile->lock;
 }
 

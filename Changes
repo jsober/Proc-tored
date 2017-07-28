@@ -2,6 +2,8 @@
 - Lock file logic moved to Proc::tored::LockFile
 - Fixed warnings triggered when cleaning up lock/pid files whose parent
   directory has been removed
+- Fixed bug permitting services to go into pause/sleep loop when another
+  instance of the process is running
 
 0.17 2017-03-18
 - Add newline to warning emitted when a signal is caught
