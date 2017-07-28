@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.18 2017-07-28
 - Lock file logic moved to Proc::tored::LockFile
 - Fixed warnings triggered when cleaning up lock/pid files whose parent
   directory has been removed
