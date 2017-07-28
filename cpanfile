@@ -14,4 +14,5 @@ requires 'Types::Standard' => 0;
 on test => sub {
   requires 'Path::Tiny' => 0.097;
   requires 'Test2::Bundle::Extended' => 0;
+  requires 'Devel::Cover' => 0;
 };
