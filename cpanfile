@@ -1,3 +1,4 @@
+requires 'perl'            => '5.010';
 requires 'Auto::Mata'      => 0.07;
 requires 'Carp'            => 0;
 requires 'Exporter'        => 0;
