@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.19 2017-08-15
 - Remove broken test from t/Proc/tored/PidFile.t
 
 0.18 2017-07-28
