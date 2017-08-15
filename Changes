@@ -1,4 +1,5 @@
 {{$NEXT}}
+- Remove broken test from t/Proc/tored/PidFile.t
 
 0.18 2017-07-28
 - Lock file logic moved to Proc::tored::LockFile
